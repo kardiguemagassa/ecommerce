@@ -2,16 +2,13 @@ spring:
   application:
     name: ecommerce
 
+  #config:
+    #import: optional:file:.env[.properties]
+
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
     username: ${POSTGRES_USERNAME}
     password: ${POSTGRES_PASSWORD}
-    driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      idle-timeout: 300000
-      connection-timeout: 30000
 
   jpa:
     hibernate:
@@ -21,4 +18,8 @@ spring:
       hibernate:
         format_sql: true
     open-in-view: false
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
 
