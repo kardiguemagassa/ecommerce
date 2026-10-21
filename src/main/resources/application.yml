@@ -13,11 +13,15 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
     properties:
       hibernate:
         format_sql: true
     open-in-view: false
+
+  data:
+    web:
+      pageable:
+        max-page-size: 100
 
 logging:
   level:
