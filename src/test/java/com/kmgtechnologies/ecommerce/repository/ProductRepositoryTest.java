@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -109,5 +110,23 @@ class ProductRepositoryTest {
 
         assertThat(productRepository.existsByCategoryId(electronics.getId())).isTrue();
         assertThat(productRepository.existsByCategoryId(empty.getId())).isFalse();
+    }
+
+    @Test
+    void findResponseById_returnsProjectionWithCategory() {
+        Long laptopId = productRepository.search(null, "Laptop", FIRST_PAGE_BY_NAME)
+                .getContent().getFirst().id();
+
+        Optional<ProductResponse> result = productRepository.findResponseById(laptopId);
+
+        assertThat(result).get().satisfies(product -> {
+            assertThat(product.name()).isEqualTo("Laptop");
+            assertThat(product.categoryName()).isEqualTo("Electronics");
+        });
+    }
+
+    @Test
+    void findResponseById_returnsEmptyForUnknownProduct() {
+        assertThat(productRepository.findResponseById(999_999L)).isEmpty();
     }
 }
