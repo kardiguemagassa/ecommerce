@@ -102,4 +102,12 @@ class ProductRepositoryTest {
 
         assertThatThrownBy(() -> productRepository.saveAndFlush(orphan)).isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    void existsByCategoryId_detectsCategoriesWithProducts() {
+        Category empty = entityManager.persistAndFlush(new Category("Empty"));
+
+        assertThat(productRepository.existsByCategoryId(electronics.getId())).isTrue();
+        assertThat(productRepository.existsByCategoryId(empty.getId())).isFalse();
+    }
 }

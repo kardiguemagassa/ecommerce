@@ -52,4 +52,21 @@ class CategoryRepositoryTest {
         assertThatThrownBy(() -> categoryRepository.saveAndFlush(new Category(tooLong)))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    void existsByNameIgnoreCase_matchesRegardlessOfCase() {
+        categoryRepository.saveAndFlush(new Category("Electronics"));
+
+        assertThat(categoryRepository.existsByNameIgnoreCase("ELECTRONICS")).isTrue();
+        assertThat(categoryRepository.existsByNameIgnoreCase("Books")).isFalse();
+    }
+
+    @Test
+    void existsByNameIgnoreCaseAndIdNot_ignoresTheCategoryItself() {
+        Category electronics = categoryRepository.saveAndFlush(new Category("Electronics"));
+        Category books = categoryRepository.saveAndFlush(new Category("Books"));
+
+        assertThat(categoryRepository.existsByNameIgnoreCaseAndIdNot("electronics", electronics.getId())).isFalse();
+        assertThat(categoryRepository.existsByNameIgnoreCaseAndIdNot("electronics", books.getId())).isTrue();
+    }
 }

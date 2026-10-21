@@ -120,8 +120,20 @@ class GlobalExceptionHandlerTest {
         @PostMapping("/validate")
         void validate(@Valid @RequestBody Payload payload) {
         }
+
+        @GetMapping("/in-use")
+        void inUse() {
+            throw new ResourceInUseException("Category 1 still contains products");
+        }
     }
 
     record Payload(@NotBlank String name) {
+    }
+
+    @Test
+    void resourceInUse_returns409() throws Exception {
+        mockMvc.perform(get("/test/in-use"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Resource in use"));
     }
 }

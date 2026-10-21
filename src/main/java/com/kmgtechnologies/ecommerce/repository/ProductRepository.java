@@ -25,4 +25,5 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
               AND lower(p.name) like lower(concat('%', :name, '%'))
             """)
     Page<ProductResponse> search (@Param("categoryId") Long categoryId, @Param("name") String name, Pageable pageable);
+    boolean existsByCategoryId(Long categoryId);
 }
