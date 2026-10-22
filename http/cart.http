@@ -1,0 +1,64 @@
+@baseUrl = http://localhost:8080
+
+### Create a category → 201
+POST {{baseUrl}}/api/categories
+Content-Type: application/json
+
+{"name": "Cart demo {{$timestamp}}"}
+
+> {% client.global.set("categoryId", response.body.id); %}
+
+### Create a product with a stock of 5 → 201
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+
+{"name": "Keyboard", "price": 49.90, "stock": 5, "categoryId": {{categoryId}}}
+
+> {% client.global.set("productId", response.body.id); %}
+
+### Create a customer → 201
+POST {{baseUrl}}/api/customers
+Content-Type: application/json
+
+{"email": "alice-{{$timestamp}}@example.com", "fullName": "Alice"}
+
+> {% client.global.set("customerId", response.body.id); %}
+
+### Get the cart before any item (empty) → 200
+GET {{baseUrl}}/api/customers/{{customerId}}/cart
+
+### Add 2 keyboards → 200 (total 99.80)
+POST {{baseUrl}}/api/customers/{{customerId}}/cart/items
+Content-Type: application/json
+
+{"productId": {{productId}}, "quantity": 2}
+
+### Add 2 more keyboards (same line, quantity 4) → 200 (total 199.60)
+POST {{baseUrl}}/api/customers/{{customerId}}/cart/items
+Content-Type: application/json
+
+{"productId": {{productId}}, "quantity": 2}
+
+### Add 2 more: 6 > stock of 5 → 409
+POST {{baseUrl}}/api/customers/{{customerId}}/cart/items
+Content-Type: application/json
+
+{"productId": {{productId}}, "quantity": 2}
+
+### Invalid quantity → 400
+POST {{baseUrl}}/api/customers/{{customerId}}/cart/items
+Content-Type: application/json
+
+{"productId": {{productId}}, "quantity": 0}
+
+### Remove the product line → 200
+DELETE {{baseUrl}}/api/customers/{{customerId}}/cart/items/{{productId}}
+
+### Remove it again → 404
+DELETE {{baseUrl}}/api/customers/{{customerId}}/cart/items/{{productId}}
+
+### Clear the cart → 204
+DELETE {{baseUrl}}/api/customers/{{customerId}}/cart
+
+### Unknown customer → 404
+GET {{baseUrl}}/api/customers/999999/cart
