@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,8 +63,7 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderService = new OrderService(orderRepository, cartRepository, customerRepository,
-                eventPublisher, Clock.fixed(NOW, ZoneOffset.UTC));
+        orderService = new OrderService(orderRepository, cartRepository, customerRepository, eventPublisher, Clock.fixed(NOW, ZoneOffset.UTC));
         alice = new Customer("alice@example.com", "Alice");
         ReflectionTestUtils.setField(alice, "id", CUSTOMER_ID);
         Category electronics = new Category("Electronics");
@@ -150,7 +150,8 @@ class OrderServiceTest {
 
         orderService.placeOrder(CUSTOMER_ID);
 
-        verify(eventPublisher).publishEvent(new OrderPlacedEvent(null, "alice@example.com", new BigDecimal("999.99")));
+        verify(eventPublisher).publishEvent(new OrderPlacedEvent(
+                null, "alice@example.com", new BigDecimal("999.99"), List.of(10L)));
     }
 
     @Test

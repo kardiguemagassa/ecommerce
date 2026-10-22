@@ -1,5 +1,7 @@
 package com.kmgtechnologies.ecommerce.controller;
 
+import com.kmgtechnologies.ecommerce.dto.TopSellingProductResponse;
+import com.kmgtechnologies.ecommerce.service.TopSellingProductService;
 import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
@@ -50,6 +52,9 @@ class ProductControllerTest {
 
     @MockitoBean
     private ProductService productService;
+
+    @MockitoBean
+    private TopSellingProductService topSellingProductService;
 
     @Test
     void search_passesFiltersAndReturnsPagedResponse() throws Exception {
@@ -164,4 +169,24 @@ class ProductControllerTest {
 
         verify(productService).delete(1L);
     }
+
+    @Test
+    void topSelling_returnsRanking() throws Exception {
+        when(topSellingProductService.findTopSelling(3))
+                .thenReturn(List.of(new TopSellingProductResponse(1L, "Laptop", 12L)));
+
+        mockMvc.perform(get("/api/products/top-selling").param("limit", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].productName").value("Laptop"))
+                .andExpect(jsonPath("$[0].totalQuantity").value(12));
+    }
+
+    @Test
+    void topSelling_rejectsLimitAbove50() throws Exception {
+        mockMvc.perform(get("/api/products/top-selling").param("limit", "51"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(topSellingProductService);
+    }
+
 }

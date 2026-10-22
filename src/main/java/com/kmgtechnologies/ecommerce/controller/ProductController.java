@@ -2,8 +2,12 @@ package com.kmgtechnologies.ecommerce.controller;
 
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
+import com.kmgtechnologies.ecommerce.dto.TopSellingProductResponse;
 import com.kmgtechnologies.ecommerce.service.ProductService;
+import com.kmgtechnologies.ecommerce.service.TopSellingProductService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -24,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Set;
 
 @RestController
@@ -33,9 +38,16 @@ public class ProductController {
     private static final Set<String> SORTABLE_PROPERTIES = Set.of("id", "name", "price", "stock");
 
     private final ProductService productService;
+    private final TopSellingProductService topSellingProductService;
 
-    public ProductController(ProductService productService) {
+    public ProductController(ProductService productService, TopSellingProductService topSellingProductService) {
         this.productService = productService;
+        this.topSellingProductService = topSellingProductService;
+    }
+
+    @GetMapping("/top-selling")
+    public List<TopSellingProductResponse> topSelling(@RequestParam(defaultValue = "10") @Min(1) @Max(50) int limit) {
+        return topSellingProductService.findTopSelling(limit);
     }
 
     @GetMapping

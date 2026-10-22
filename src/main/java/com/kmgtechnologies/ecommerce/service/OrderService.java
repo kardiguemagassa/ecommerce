@@ -69,7 +69,10 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         cart.clear();
         eventPublisher.publishEvent(new OrderPlacedEvent(
-                saved.getId(), saved.getCustomer().getEmail(), saved.getTotalAmount()));
+                saved.getId(),
+                saved.getCustomer().getEmail(),
+                saved.getTotalAmount(),
+                saved.getItems().stream().map(item -> item.getProduct().getId()).toList()));
         return OrderResponse.from(saved);
     }
 

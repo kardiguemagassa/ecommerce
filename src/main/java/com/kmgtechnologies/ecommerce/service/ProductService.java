@@ -12,6 +12,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kmgtechnologies.ecommerce.config.CacheNames;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+
 @Service
 @Transactional(readOnly = true)
 public class ProductService {
@@ -29,6 +33,7 @@ public class ProductService {
         return productRepository.search(categoryId, normalizedName, pageable);
     }
 
+    @Cacheable(cacheNames = CacheNames.PRODUCTS, key = "#id")
     public ProductResponse findById(Long id) {
         return productRepository.findResponseById(id).orElseThrow(() -> new ResourceNotFoundException("Product", id));
     }
@@ -46,6 +51,7 @@ public class ProductService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.PRODUCTS, key = "#id")
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = productRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Product", id));
 
@@ -59,6 +65,7 @@ public class ProductService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.PRODUCTS, key = "#id")
     public void delete(Long id) {
         if (!productRepository.existsById(id)) {
             throw new ResourceNotFoundException("Product", id);

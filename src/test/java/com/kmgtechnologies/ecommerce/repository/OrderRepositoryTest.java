@@ -1,6 +1,7 @@
 package com.kmgtechnologies.ecommerce.repository;
 
 import com.kmgtechnologies.ecommerce.dto.OrderSummaryResponse;
+import com.kmgtechnologies.ecommerce.dto.TopSellingProductResponse;
 import com.kmgtechnologies.ecommerce.entity.Category;
 import com.kmgtechnologies.ecommerce.entity.Customer;
 import com.kmgtechnologies.ecommerce.entity.Order;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -21,6 +23,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.tuple;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -100,5 +103,23 @@ class OrderRepositoryTest {
 
         assertThat(orderRepository.findById(saved.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void findTopSelling_ranksProductsByTotalQuantity() {
+        Product mouse = entityManager.persist(new Product("Mouse", null, new BigDecimal("19.90"), 50, laptop.getCategory()));
+        Order first = new Order(alice, Instant.parse("2026-10-22T10:00:00Z"));
+        first.addItem(laptop, 1);
+        first.addItem(mouse, 3);
+        Order second = new Order(alice, Instant.parse("2026-10-22T11:00:00Z"));
+        second.addItem(mouse, 2);
+        orderRepository.saveAndFlush(first);
+        orderRepository.saveAndFlush(second);
+
+        assertThat(orderRepository.findTopSelling(Limit.of(10)))
+                .extracting(TopSellingProductResponse::productName, TopSellingProductResponse::totalQuantity)
+                .containsExactly(tuple("Mouse", 5L), tuple("Laptop", 1L));
+
+        assertThat(orderRepository.findTopSelling(Limit.of(1))).hasSize(1);
     }
 }
