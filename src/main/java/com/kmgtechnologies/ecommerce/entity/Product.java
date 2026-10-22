@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.entity;
 
+import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -110,5 +111,15 @@ public class Product {
     @Override
     public int hashCode() {
         return getClass().hashCode();
+    }
+
+    public void decreaseStock(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be positive");
+        }
+        if (quantity > stock) {
+            throw new InsufficientStockException(name, quantity, stock);
+        }
+        stock -= quantity;
     }
 }
