@@ -125,6 +125,11 @@ class GlobalExceptionHandlerTest {
         void inUse() {
             throw new ResourceInUseException("Category 1 still contains products");
         }
+
+        @GetMapping("/stock")
+        void stock() {
+            throw new InsufficientStockException("Laptop", 11, 10);
+        }
     }
 
     record Payload(@NotBlank String name) {
@@ -135,5 +140,12 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get("/test/in-use"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Resource in use"));
+    }
+
+    @Test
+    void insufficientStock_returns409() throws Exception {
+        mockMvc.perform(get("/test/stock"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Insufficient stock"));
     }
 }
