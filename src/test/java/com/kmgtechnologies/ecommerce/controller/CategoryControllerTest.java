@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.controller;
 
+import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.CategoryRequest;
 import com.kmgtechnologies.ecommerce.dto.CategoryResponse;
 import com.kmgtechnologies.ecommerce.exception.DuplicateResourceException;
@@ -29,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(CategoryController.class)
+@ActiveProfiles("test")
 class CategoryControllerTest {
 
     private static final String BOOKS_JSON = """

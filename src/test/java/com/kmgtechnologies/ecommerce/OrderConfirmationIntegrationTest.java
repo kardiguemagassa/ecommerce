@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce;
 
+import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CustomerRequest;
 import com.kmgtechnologies.ecommerce.dto.OrderResponse;
@@ -34,6 +35,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
+@ActiveProfiles("test")
 class OrderConfirmationIntegrationTest {
 
     @Autowired

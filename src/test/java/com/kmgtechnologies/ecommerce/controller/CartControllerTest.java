@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.controller;
 
+import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CartItemResponse;
 import com.kmgtechnologies.ecommerce.dto.CartResponse;
@@ -28,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(CartController.class)
+@ActiveProfiles("test")
 class CartControllerTest {
 
     private static final CartResponse CART_WITH_LAPTOP = new CartResponse(
