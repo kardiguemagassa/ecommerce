@@ -2,8 +2,8 @@ spring:
   application:
     name: ecommerce
 
-  #config:
-    #import: optional:file:.env[.properties]
+  config:
+    import: optional:file:.env[.properties]
 
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
