@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.mockito.Mockito.inOrder;
 
@@ -27,8 +28,7 @@ class OrderConfirmationListenerTest {
 
     @Test
     void onOrderPlaced_sendsEmailThenConfirmsOrder() {
-        listener.onOrderPlaced(new OrderPlacedEvent(5L, "alice@example.com", new BigDecimal("999.99")));
-
+        listener.onOrderPlaced(new OrderPlacedEvent(5L, "alice@example.com", new BigDecimal("999.99"), List.of(10L)));
         InOrder inOrder = inOrder(emailSender, orderService);
         inOrder.verify(emailSender).sendOrderConfirmation("alice@example.com", 5L, new BigDecimal("999.99"));
         inOrder.verify(orderService).markAsConfirmed(5L);

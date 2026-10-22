@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.service;
 
+import com.kmgtechnologies.ecommerce.config.CacheNames;
 import com.kmgtechnologies.ecommerce.dto.CategoryRequest;
 import com.kmgtechnologies.ecommerce.dto.CategoryResponse;
 import com.kmgtechnologies.ecommerce.entity.Category;
@@ -8,6 +9,7 @@ import com.kmgtechnologies.ecommerce.exception.ResourceInUseException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.repository.CategoryRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +48,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.PRODUCTS, allEntries = true)
     public CategoryResponse update(Long id, CategoryRequest request) {
         Category category = getCategory(id);
         String name = request.name().strip();

@@ -1,6 +1,5 @@
-package com.kmgtechnologies.ecommerce;
+package com.kmgtechnologies.ecommerce.integration;
 
-import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CustomerRequest;
 import com.kmgtechnologies.ecommerce.dto.OrderResponse;
@@ -17,7 +16,6 @@ import com.kmgtechnologies.ecommerce.service.CustomerService;
 import com.kmgtechnologies.ecommerce.service.OrderService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
@@ -34,9 +32,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class OrderConfirmationIntegrationTest {
+@IntegrationTest
+class OrderConfirmationIT {
 
     @Autowired
     private CategoryRepository categoryRepository;
