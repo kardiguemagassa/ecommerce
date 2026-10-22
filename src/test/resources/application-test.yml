@@ -13,3 +13,7 @@ spring:
 app:
   notification:
     simulated-delay: PT0S
+
+logging:
+  level:
+    org.hibernate.SQL: warn
