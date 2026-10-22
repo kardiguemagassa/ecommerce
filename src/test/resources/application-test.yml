@@ -14,6 +14,10 @@ app:
   notification:
     simulated-delay: PT0S
 
+management:
+  server:
+    port: 0
+
 logging:
   level:
     org.hibernate.SQL: warn
