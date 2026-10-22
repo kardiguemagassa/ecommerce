@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:ecommerce;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  test:
+    database:
+      replace: none
+
+app:
+  notification:
+    simulated-delay: PT0S
+
+management:
+  server:
+    port: 0
+
+logging:
+  level:
+    org.hibernate.SQL: warn

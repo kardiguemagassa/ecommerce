@@ -1,0 +1,53 @@
+@baseUrl = http://localhost:8080
+
+### Create a category for the products → 201
+POST {{baseUrl}}/api/categories
+Content-Type: application/json
+
+{"name": "Electronics"}
+
+> {% client.global.set("categoryId", response.body.id); %}
+
+### Create a product → 201
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+
+{"name": "Laptop", "description": "15 inch", "price": 999.99, "stock": 10, "categoryId": {{categoryId}}}
+
+> {% client.global.set("productId", response.body.id); %}
+
+### Invalid product → 400
+POST {{baseUrl}}/api/products
+Content-Type: application/json
+
+{"name": "", "price": 0, "stock": -1}
+
+### List products (default: page 0, size 20, sorted by name) → 200
+GET {{baseUrl}}/api/products
+
+### Filter by category → 200
+GET {{baseUrl}}/api/products?categoryId={{categoryId}}
+
+### Search by name, sorted by price → 200
+GET {{baseUrl}}/api/products?name=lap&sort=price,desc
+
+### Sort by a forbidden property → 400
+GET {{baseUrl}}/api/products?sort=password
+
+### Get the product → 200
+GET {{baseUrl}}/api/products/{{productId}}
+
+### Update the product → 200
+PUT {{baseUrl}}/api/products/{{productId}}
+Content-Type: application/json
+
+{"name": "Laptop Pro", "description": "16 inch", "price": 1499.00, "stock": 5, "categoryId": {{categoryId}}}
+
+### Delete the category while it has products → 409
+DELETE {{baseUrl}}/api/categories/{{categoryId}}
+
+### Delete the product → 204
+DELETE {{baseUrl}}/api/products/{{productId}}
+
+### Delete the now empty category → 204
+DELETE {{baseUrl}}/api/categories/{{categoryId}}
