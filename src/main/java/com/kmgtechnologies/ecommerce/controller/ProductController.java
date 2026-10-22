@@ -42,7 +42,7 @@ public class ProductController {
     public PagedModel<ProductResponse> search(@RequestParam(required = false) Long categoryId,
                                               @RequestParam(required = false) String name,
                                               @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        validateSort(pageable.getSort());
+        SortValidation.requireAllowed(pageable.getSort(), SORTABLE_PROPERTIES);
         return new PagedModel<>(productService.search(categoryId, name, pageable));
     }
 
@@ -72,12 +72,5 @@ public class ProductController {
         productService.delete(id);
     }
 
-    private static void validateSort(Sort sort) {
-        for (Sort.Order order : sort) {
-            if (!SORTABLE_PROPERTIES.contains(order.getProperty())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Cannot sort by '" + order.getProperty() + "'. Allowed: " + SORTABLE_PROPERTIES);
-            }
-        }
-    }
+
 }
