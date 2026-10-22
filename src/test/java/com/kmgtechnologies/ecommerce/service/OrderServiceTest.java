@@ -34,6 +34,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.kmgtechnologies.ecommerce.event.OrderPlacedEvent;
+import org.springframework.context.ApplicationEventPublisher;
+
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
@@ -49,6 +52,9 @@ class OrderServiceTest {
     @Mock
     private CustomerRepository customerRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private OrderService orderService;
     private Customer alice;
     private Product laptop;
@@ -57,7 +63,7 @@ class OrderServiceTest {
     @BeforeEach
     void setUp() {
         orderService = new OrderService(orderRepository, cartRepository, customerRepository,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                eventPublisher, Clock.fixed(NOW, ZoneOffset.UTC));
         alice = new Customer("alice@example.com", "Alice");
         ReflectionTestUtils.setField(alice, "id", CUSTOMER_ID);
         Category electronics = new Category("Electronics");
@@ -132,6 +138,38 @@ class OrderServiceTest {
                 .hasMessage("Insufficient stock for 'Mouse': requested 5, available 3");
         verify(orderRepository, never()).save(any());
         assertThat(cart.getItems()).hasSize(2);
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void placeOrder_publishesOrderPlacedEvent() {
+        Cart cart = new Cart(alice);
+        cart.addItem(laptop, 1);
+        when(cartRepository.findWithItemsByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cart));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        orderService.placeOrder(CUSTOMER_ID);
+
+        verify(eventPublisher).publishEvent(new OrderPlacedEvent(null, "alice@example.com", new BigDecimal("999.99")));
+    }
+
+    @Test
+    void markAsConfirmed_confirmsPendingOrder() {
+        Order order = new Order(alice, NOW);
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+
+        orderService.markAsConfirmed(5L);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    void markAsConfirmed_ignoresUnknownOrder() {
+        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+
+        orderService.markAsConfirmed(99L);
+
+        verify(orderRepository).findById(99L);
     }
 
     @Test

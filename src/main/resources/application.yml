@@ -23,6 +23,14 @@ spring:
       pageable:
         max-page-size: 100
 
+  task:
+    execution:
+      thread-name-prefix: async-
+      pool:
+        core-size: 2
+        max-size: 4
+        queue-capacity: 100
+
 logging:
   level:
     org.hibernate.SQL: DEBUG
