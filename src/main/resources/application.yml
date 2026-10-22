@@ -2,8 +2,8 @@ spring:
   application:
     name: ecommerce
 
-  #config:
-    #import: optional:file:.env[.properties]
+  config:
+    import: optional:file:.env[.properties]
 
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
@@ -22,6 +22,14 @@ spring:
     web:
       pageable:
         max-page-size: 100
+
+  task:
+    execution:
+      thread-name-prefix: async-
+      pool:
+        core-size: 2
+        max-size: 4
+        queue-capacity: 100
 
 logging:
   level:

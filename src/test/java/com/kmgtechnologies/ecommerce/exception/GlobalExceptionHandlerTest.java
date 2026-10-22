@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.exception;
 
+import org.springframework.test.context.ActiveProfiles;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
@@ -8,6 +9,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.ThrowingController.class)
+@ActiveProfiles("test")
 @Import(GlobalExceptionHandlerTest.ThrowingController.class)
 class GlobalExceptionHandlerTest {
 
@@ -130,6 +133,16 @@ class GlobalExceptionHandlerTest {
         void stock() {
             throw new InsufficientStockException("Laptop", 11, 10);
         }
+
+        @GetMapping("/empty-cart")
+        void emptyCart() {
+            throw new EmptyCartException(1L);
+        }
+
+        @GetMapping("/optimistic-lock")
+        void optimisticLock() {
+            throw new ObjectOptimisticLockingFailureException("Product", 10L);
+        }
     }
 
     record Payload(@NotBlank String name) {
@@ -147,5 +160,19 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get("/test/stock"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Insufficient stock"));
+    }
+
+    @Test
+    void emptyCart_returns409() throws Exception {
+        mockMvc.perform(get("/test/empty-cart"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Empty cart"));
+    }
+
+    @Test
+    void optimisticLockingFailure_returns409() throws Exception {
+        mockMvc.perform(get("/test/optimistic-lock"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Concurrent modification"));
     }
 }

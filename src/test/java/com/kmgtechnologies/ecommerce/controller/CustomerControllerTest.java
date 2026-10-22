@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.controller;
 
+import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.CustomerRequest;
 import com.kmgtechnologies.ecommerce.dto.CustomerResponse;
 import com.kmgtechnologies.ecommerce.exception.DuplicateResourceException;
@@ -22,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(CustomerController.class)
+@ActiveProfiles("test")
 class CustomerControllerTest {
 
     private static final String ALICE_JSON = """

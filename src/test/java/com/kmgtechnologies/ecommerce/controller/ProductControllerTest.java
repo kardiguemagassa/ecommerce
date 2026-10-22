@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.controller;
 
+import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
@@ -34,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ProductController.class)
+@ActiveProfiles("test")
 class ProductControllerTest {
 
     private static final ProductResponse LAPTOP = new ProductResponse(
