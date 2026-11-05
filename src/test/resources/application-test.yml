@@ -3,7 +3,7 @@
 # Flyway applies the same migrations as in production, then Hibernate validates the schema.
 spring:
   datasource:
-    url: jdbc:tc:postgresql:16-alpine:///ecommerce?TC_DAEMON=true
+    url: jdbc:tc:postgresql:18-alpine:///ecommerce?TC_DAEMON=true
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
     username: test
     password: test

@@ -1,0 +1,65 @@
+name: ecommerce
+
+# "docker compose up -d" starts the database only (application run from the IDE or ./mvnw spring-boot:run);
+# "docker compose --profile app up -d --build --wait" starts the API container as well.
+# Values come from .env (see .env.example): no credential in this file.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USERNAME:?POSTGRES_USERNAME is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+      # Loopback only: reachable by the application started on the host, not from the network.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # PostgreSQL 18 images keep their data under /var/lib/postgresql/18/docker: mount the parent.
+      - postgres-data:/var/lib/postgresql
+    networks: [db-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    profiles: [app]
+    image: ${IMAGE_NAMESPACE:-local}/ecommerce-api:${IMAGE_TAG:-dev}
+    build: .
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USERNAME: ${POSTGRES_USERNAME:?POSTGRES_USERNAME is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+      # Actuator, loopback only: scraped by the Prometheus of monitoring/ (host.docker.internal:8081).
+      - "127.0.0.1:${MANAGEMENT_PORT:-8081}:8081"
+    networks: [default, db-net]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          # The JVM sizes its heap from this limit (MaxRAMPercentage=60 in the image).
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  # The database is reachable by the API only; the API also joins "default" for its published ports.
+  db-net:
+
+volumes:
+  postgres-data:
