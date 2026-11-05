@@ -10,9 +10,10 @@ spring:
     username: ${POSTGRES_USERNAME}
     password: ${POSTGRES_PASSWORD}
 
+  # Schema owned by Flyway (src/main/resources/db/migration); Hibernate only checks it matches the entities
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true

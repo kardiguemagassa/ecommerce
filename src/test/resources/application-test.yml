@@ -1,11 +1,12 @@
+# Real PostgreSQL through the Testcontainers JDBC driver: one container per test JVM,
+# shared by every Spring context (TC_DAEMON keeps it up until the JVM exits).
+# Flyway applies the same migrations as in production, then Hibernate validates the schema.
 spring:
   datasource:
-    url: jdbc:h2:mem:ecommerce;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
-    username: sa
-    password:
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
+    url: jdbc:tc:postgresql:16-alpine:///ecommerce?TC_DAEMON=true
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: test
+    password: test
   test:
     database:
       replace: none
