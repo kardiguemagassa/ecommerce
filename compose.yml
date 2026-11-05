@@ -1,7 +1,7 @@
 name: ecommerce
 
-# "docker compose up -d" starts the database only (application run from the IDE or ./mvnw spring-boot:run);
-# "docker compose --profile app up -d --build --wait" starts the API container as well.
+# "docker compose up -d" starts the database and the observability backend (application run from the IDE or
+# ./mvnw spring-boot:run); "docker compose --profile app up -d --build --wait" starts the API container as well.
 # Values come from .env (see .env.example): no credential in this file.
 
 services:
@@ -36,9 +36,15 @@ services:
       POSTGRES_USERNAME: ${POSTGRES_USERNAME:?POSTGRES_USERNAME is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}
+      # Every request traced in development; traces, metrics and logs sent to the collector on the compose network.
+      TRACING_SAMPLING_PROBABILITY: "1.0"
+      OTEL_TRACES_ENDPOINT: http://otel-lgtm:4318/v1/traces
+      OTEL_METRICS_ENDPOINT: http://otel-lgtm:4318/v1/metrics
+      OTEL_LOGS_ENDPOINT: http://otel-lgtm:4318/v1/logs
+      OTEL_METRICS_STEP: 10s
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
-      # Actuator, loopback only: scraped by the Prometheus of monitoring/ (host.docker.internal:8081).
+      # Actuator (health, info, metrics), loopback only.
       - "127.0.0.1:${MANAGEMENT_PORT:-8081}:8081"
     networks: [default, db-net]
     depends_on:
@@ -55,6 +61,23 @@ services:
       timeout: 3s
       retries: 30
       start_period: 30s
+    restart: unless-stopped
+
+  # Observability backend for development, in one container: OpenTelemetry collector (OTLP), Tempo (traces),
+  # Prometheus (metrics), Loki (logs) and Grafana. Not a production setup: no persistence, default admin account.
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.38.1
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"   # Grafana (admin / admin)
+      - "127.0.0.1:4318:4318"                     # OTLP over HTTP, for the application started on the host
+    # The dashboard (observability/grafana), provisioned at startup in the "E-commerce" folder.
+    volumes:
+      - ./observability/grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/ecommerce.yaml:ro
+      - ./observability/grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards/ecommerce:ro
+    # The image's own health check, with a long start period: Grafana can take minutes on a loaded machine.
+    healthcheck:
+      start_period: 180s
+      start_interval: 5s
     restart: unless-stopped
 
 networks:

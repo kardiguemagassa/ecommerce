@@ -13,7 +13,7 @@ consistency, caching, observability and an automated test suite.
   then confirmed **asynchronously** after commit (email + status `PENDING` → `CONFIRMED`)
 - **Best sellers** — `GET /api/products/top-selling`, cached
 - **Errors** — uniform [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`
-- **Observability** — Actuator on a dedicated port, business metrics, Prometheus + Grafana stack
+- **Observability** — OpenTelemetry traces (HTTP, SQL, async confirmation), metrics and logs, Grafana dashboard
 - **API documentation** — OpenAPI 3 / Swagger UI, switchable off for production
 
 ## Tech stack
@@ -24,7 +24,7 @@ consistency, caching, observability and an automated test suite.
 | Framework | Spring Boot 4.1 (Spring 7, Hibernate 7, Jackson 3) |
 | Database | PostgreSQL 18, schema versioned with Flyway |
 | Cache | Caffeine (Spring Cache abstraction) |
-| Metrics | Micrometer, Prometheus, Grafana |
+| Observability | Micrometer, OpenTelemetry (OTLP), Grafana LGTM: Tempo, Prometheus, Loki |
 | API docs | springdoc-openapi 3 |
 | Tests | JUnit 5, Mockito, AssertJ, Awaitility, Testcontainers (PostgreSQL), JaCoCo |
 | Build | Maven (Surefire for unit tests, Failsafe for integration tests) |
@@ -34,7 +34,7 @@ consistency, caching, observability and an automated test suite.
 
 ### Prerequisites
 
-- Docker: database, tests (Testcontainers), monitoring stack, and optionally the API itself
+- Docker: database, observability backend, tests (Testcontainers), and optionally the API itself
 - Java 21, to build and run the application outside a container
 
 ### Configuration
@@ -52,11 +52,13 @@ cp .env.example .env
 | `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database credentials | — |
 | `MANAGEMENT_PORT` | Actuator port | `8081` |
 | `API_PORT` | API port published by Compose | `8080` |
+| `TRACING_SAMPLING_PROBABILITY` | Share of requests traced | `0.1` (`1.0` in `.env.example` and Compose) |
 | `API_DOCS_ENABLED` | Expose OpenAPI + Swagger UI | `true` (set `false` in production) |
 
 ### Run
 
-PostgreSQL always runs in Docker (`compose.yaml`, data kept in the `postgres-data` volume). The API
+PostgreSQL and the observability backend always run in Docker (`compose.yml`; database data kept in the
+`postgres-data` volume). The API
 runs either from the IDE / Maven, or in a container too:
 
 ```bash
@@ -80,7 +82,8 @@ memory limit from which the JVM sizes its heap.
 | http://localhost:8080/swagger-ui.html | Swagger UI |
 | http://localhost:8080/v3/api-docs | OpenAPI document (JSON) |
 | http://localhost:8081/actuator/health | Health, liveness and readiness probes |
-| http://localhost:8081/actuator/prometheus | Metrics in Prometheus format |
+| http://localhost:8081/actuator/metrics | Metrics (also pushed over OTLP) |
+| http://localhost:3000 | Grafana: dashboard, traces, logs (admin / admin) |
 
 Ready-to-run requests for the IntelliJ HTTP client are in [`http/`](http/).
 
@@ -207,33 +210,43 @@ evicts nothing and is not counted.
 
 ## Observability
 
-Actuator runs on a **separate management port** (`8081`), so the public API port never exposes
-`/actuator`. Only `health`, `info`, `metrics` and `prometheus` are exposed; health details are hidden.
+Traces, metrics and logs are exported over **OTLP** (OpenTelemetry) to `grafana/otel-lgtm` in development: one
+container with the OpenTelemetry collector, Tempo (traces), Prometheus (metrics), Loki (logs) and Grafana, started by
+`docker compose up -d`. Changing backend (Grafana Cloud, Datadog, Elastic...) means changing the OTLP endpoints, not
+the code.
+
+| Signal | What you get |
+|---|---|
+| **Traces** | One trace per request: HTTP, every SQL query, and for an order the **asynchronous confirmation** in the same trace (context propagated to the `@Async` thread). Sampling 100 % in development, 10 % by default |
+| **Logs** | Console unchanged, and every log line sent to Loki with its trace and span ids |
+| **Metrics** | Pushed every 10 s in Compose (1 min by default), shown by the *E-commerce — Vue d'ensemble* dashboard |
+| **Errors** | Every RFC 9457 response carries a `traceId`: a reported error leads straight to its trace |
+
+Health probes and SQL run outside of any request (Flyway, connection pool) create no trace. SQL spans never contain
+parameter values.
 
 | Metric | Source |
 |---|---|
 | `ecommerce_orders_placed_total` | Orders committed (counted after commit) |
 | `ecommerce_orders_amount` | Order amounts: count, sum, max (revenue, average basket) |
-| `ecommerce_orders_confirmation_seconds{outcome}` | Duration of the async confirmation, success/failure |
-| `http_server_requests_seconds` | Per-endpoint traffic, status and latency histogram (p95) |
+| `ecommerce_orders_confirmation_milliseconds{outcome}` | Duration of the async confirmation, success/failure |
+| `http_server_requests_milliseconds` | Per-endpoint traffic, status and latency histogram (p95) |
 | `cache_gets_total{result}` | Cache hits and misses |
 | `hikaricp_*`, `executor_*`, `jvm_*` | Connection pool, async pool, JVM |
 
-### Prometheus + Grafana
+Actuator runs on a **separate management port** (`8081`), so the public API port never exposes `/actuator`. Only
+`health`, `info` and `metrics` are exposed; health details are hidden.
 
-```bash
-cp monitoring/.env.example monitoring/.env    # set GRAFANA_ADMIN_PASSWORD
-./mvnw spring-boot:run
-cd monitoring && docker compose up -d
-```
+### Following an order in Grafana
 
-- Prometheus: http://localhost:9090/targets — target `ecommerce` must be **UP**
-- Grafana: http://localhost:3000 — the provisioned *E-commerce — Vue d'ensemble* dashboard shows
-  orders per minute, revenue, average basket, cache hit ratio, p95 latency per endpoint and
-  confirmation duration
+http://localhost:3000 (admin / admin):
 
-The dashboard and datasource are provisioned from files (*dashboard as code*); both containers bind to
-`127.0.0.1` only.
+- **Dashboards → E-commerce → Vue d'ensemble**: orders per minute, revenue, average basket, cache hit ratio, p95
+  latency per endpoint, confirmation duration (provisioned from `observability/grafana`, read-only)
+- **Explore → Tempo**, query `{ resource.service.name = "ecommerce" && span.http.route = "/api/customers/{customerId}/orders" }`:
+  the order trace, with its SQL queries and the `order confirmation` span; **Logs for this span** opens the matching
+  lines in Loki
+- **Explore → Loki**: `{service_name="ecommerce"} | trace_id="<traceId>"` for the logs of one request
 
 ## Tests
 
@@ -252,9 +265,10 @@ shared by all Spring contexts.
 | Services | Mockito | Business rules, events published or not |
 | Repositories | `@DataJpaTest` on PostgreSQL | Migrations, queries, projections, constraints |
 | Controllers | `@WebMvcTest` | Validation, status codes, RFC 9457 payloads |
+| Observability | JUnit, OpenTelemetry SDK (in-memory) | Noise filter, logs exported with their trace id, `traceId` in errors |
 | Integration (`*IT`) | `@SpringBootTest` | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch |
 
-161 tests (144 unit/slice, 17 integration). Coverage report: `target/site/jacoco/index.html`.
+177 tests (158 unit/slice, 19 integration). Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 

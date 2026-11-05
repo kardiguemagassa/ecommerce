@@ -10,4 +10,4 @@ target/
 .env.*
 !.env.example
 http/
-monitoring/
+observability/

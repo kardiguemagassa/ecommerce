@@ -2,7 +2,9 @@ package com.kmgtechnologies.ecommerce.notification;
 
 import com.kmgtechnologies.ecommerce.event.OrderPlacedEvent;
 import com.kmgtechnologies.ecommerce.service.OrderService;
+import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.observation.ObservationRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +41,10 @@ class OrderConfirmationListenerTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        listener = new OrderConfirmationListener(emailSender, orderService, meterRegistry);
+        // As in the application: observations recorded as timers
+        ObservationRegistry observationRegistry = ObservationRegistry.create();
+        observationRegistry.observationConfig().observationHandler(new DefaultMeterObservationHandler(meterRegistry));
+        listener = new OrderConfirmationListener(emailSender, orderService, observationRegistry);
     }
 
     @Test
@@ -49,7 +54,7 @@ class OrderConfirmationListenerTest {
         InOrder inOrder = inOrder(emailSender, orderService);
         inOrder.verify(emailSender).sendOrderConfirmation("alice@example.com", 5L, new BigDecimal("999.99"));
         inOrder.verify(orderService).markAsConfirmed(5L);
-        assertThat(meterRegistry.get(OrderConfirmationListener.CONFIRMATION_TIMER)
+        assertThat(meterRegistry.get(OrderConfirmationListener.CONFIRMATION_OBSERVATION)
                 .tag("outcome", "success").timer().count()).isEqualTo(1);
     }
 
@@ -62,7 +67,7 @@ class OrderConfirmationListenerTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verify(orderService, never()).markAsConfirmed(any());
-        assertThat(meterRegistry.get(OrderConfirmationListener.CONFIRMATION_TIMER)
+        assertThat(meterRegistry.get(OrderConfirmationListener.CONFIRMATION_OBSERVATION)
                 .tag("outcome", "failure").timer().count()).isEqualTo(1);
     }
 }
