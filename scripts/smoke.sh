@@ -38,6 +38,8 @@ for _ in $(seq 1 "$ATTEMPTS"); do
   trace=$(curl -fsS -G "$GRAFANA/tempo/api/search" \
             --data-urlencode "q={ name = \"order confirmation\" && span.order.id = \"$order\" }" 2>/dev/null \
           | json ".get('traces', [{}])[0].get('traceID', '')" 2>/dev/null) || trace=""
+  # Tempo drops the leading zeros of trace ids in search results; logs carry the full 32 hex digits.
+  [ -n "$trace" ] && trace=$(printf '%32s' "$trace" | tr ' ' 0)
   [ -n "$trace" ] && break
   sleep 3
 done
