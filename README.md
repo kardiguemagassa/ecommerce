@@ -1,5 +1,8 @@
 # E-commerce Backend — Spring Boot 4
 
+[![CI](https://github.com/kardiguemagassa/ecommerce/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/kardiguemagassa/ecommerce/actions/workflows/ci.yml)
+[![Release](https://github.com/kardiguemagassa/ecommerce/actions/workflows/release.yml/badge.svg)](https://github.com/kardiguemagassa/ecommerce/actions/workflows/release.yml)
+
 A simplified e-commerce REST API: product catalog with search and caching, shopping cart, and orders
 confirmed asynchronously. Built as a production-minded showcase: query optimization, transactional
 consistency, caching, observability and an automated test suite.
@@ -13,7 +16,7 @@ consistency, caching, observability and an automated test suite.
   then confirmed **asynchronously** after commit (email + status `PENDING` → `CONFIRMED`)
 - **Best sellers** — `GET /api/products/top-selling`, cached
 - **Errors** — uniform [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`
-- **Observability** — Actuator on a dedicated port, business metrics, Prometheus + Grafana stack
+- **Observability** — OpenTelemetry traces (HTTP, SQL, async confirmation), metrics and logs, Grafana dashboard
 - **API documentation** — OpenAPI 3 / Swagger UI, switchable off for production
 
 ## Tech stack
@@ -22,25 +25,25 @@ consistency, caching, observability and an automated test suite.
 |---|---|
 | Language / runtime | Java 21 |
 | Framework | Spring Boot 4.1 (Spring 7, Hibernate 7, Jackson 3) |
-| Database | PostgreSQL 16 (H2 in PostgreSQL mode for tests) |
+| Database | PostgreSQL 18, schema versioned with Flyway |
 | Cache | Caffeine (Spring Cache abstraction) |
-| Metrics | Micrometer, Prometheus, Grafana |
+| Observability | Micrometer, OpenTelemetry (OTLP), Grafana LGTM: Tempo, Prometheus, Loki |
 | API docs | springdoc-openapi 3 |
-| Tests | JUnit 5, Mockito, AssertJ, Awaitility, JaCoCo |
+| Tests | JUnit 5, Mockito, AssertJ, Awaitility, Testcontainers (PostgreSQL), JaCoCo |
 | Build | Maven (Surefire for unit tests, Failsafe for integration tests) |
+| Packaging | Docker multi-stage image (layered, non-root), Docker Compose |
 
 ## Getting started
 
 ### Prerequisites
 
-- Java 21
-- PostgreSQL 16 with an empty database
-- Docker (optional, for the monitoring stack)
+- Docker: database, observability backend, tests (Testcontainers), and optionally the API itself
+- Java 21, to build and run the application outside a container
 
 ### Configuration
 
 Copy the template and fill in your local values. `.env` is git-ignored and loaded automatically
-by Spring (`spring.config.import`).
+by Spring (`spring.config.import`) and by Docker Compose.
 
 ```bash
 cp .env.example .env
@@ -51,13 +54,30 @@ cp .env.example .env
 | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB` | Database location | — |
 | `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database credentials | — |
 | `MANAGEMENT_PORT` | Actuator port | `8081` |
+| `API_PORT` | API port published by Compose | `8080` |
+| `TRACING_SAMPLING_PROBABILITY` | Share of requests traced | `0.1` (`1.0` in `.env.example` and Compose) |
 | `API_DOCS_ENABLED` | Expose OpenAPI + Swagger UI | `true` (set `false` in production) |
 
 ### Run
 
+PostgreSQL and the observability backend always run in Docker (`compose.yml`; database data kept in the
+`postgres-data` volume). The API
+runs either from the IDE / Maven, or in a container too:
+
 ```bash
+# Database in Docker, API on the host (hot reload with DevTools)
+docker compose up -d --wait
 ./mvnw spring-boot:run
+
+# Everything in Docker
+docker compose --profile app up -d --build --wait
+
+# Stop (data kept); add -v to delete the database volume
+docker compose --profile app down
 ```
+
+Every port is published on `127.0.0.1` only. The API container runs as a non-root user, with a 512 MB
+memory limit from which the JVM sizes its heap.
 
 | URL | Content |
 |---|---|
@@ -65,9 +85,32 @@ cp .env.example .env
 | http://localhost:8080/swagger-ui.html | Swagger UI |
 | http://localhost:8080/v3/api-docs | OpenAPI document (JSON) |
 | http://localhost:8081/actuator/health | Health, liveness and readiness probes |
-| http://localhost:8081/actuator/prometheus | Metrics in Prometheus format |
+| http://localhost:8081/actuator/metrics | Metrics (also pushed over OTLP) |
+| http://localhost:3000 | Grafana: dashboard, traces, logs (admin / admin) |
 
 Ready-to-run requests for the IntelliJ HTTP client are in [`http/`](http/).
+
+### Database migrations
+
+The schema is owned by [Flyway](https://documentation.red-gate.com/flyway) scripts in
+[`src/main/resources/db/migration`](src/main/resources/db/migration), applied on startup.
+Hibernate only validates it (`ddl-auto: validate`): the application refuses to start if the
+entities and the schema disagree.
+
+| Version | Change |
+|---|---|
+| `V1` | Initial schema (tables, sequences, constraints, indexes of v1.0.0) |
+| `V2` | Unique index on `lower(name)` for categories |
+
+A database created by v1.0.0 (schema generated by Hibernate, no Flyway history) must be
+**baselined once** at V1, so that Flyway only applies the later scripts:
+
+```bash
+SPRING_FLYWAY_BASELINE_ON_MIGRATE=true ./mvnw spring-boot:run
+```
+
+Baselining is not enabled permanently: on an unexpected non-empty database, failing is safer than
+silently skipping V1.
 
 ## API overview
 
@@ -157,6 +200,7 @@ evicts nothing and is not counted.
 | Concern | Decision | Why |
 |---|---|---|
 | N+1 queries | DTO projections (`select new ...`) for lists, `JOIN FETCH` for the cart, `@EntityGraph` for order details; `open-in-view: false` | One query per use case; lazy loading cannot leak into the web layer |
+| Schema | Flyway migrations, Hibernate `validate` | Reviewed, versioned DDL; drift between entities and schema fails at startup |
 | Identifiers | `SEQUENCE` with `allocationSize = 50` | Enables JDBC batching; avoids one round-trip per insert, unlike `IDENTITY` |
 | Concurrency | Optimistic locking (`@Version`) on products and orders → `409` | Two orders cannot oversell the last unit; no long-held locks |
 | Order history | Product name and unit price snapshotted in `OrderItem` | Past orders stay correct after a price change |
@@ -165,36 +209,50 @@ evicts nothing and is not counted.
 | Async work | `@TransactionalEventListener(AFTER_COMMIT)` + `@Async` on a bounded pool | The HTTP response does not wait for the email |
 | Time | Injected `Clock` | Deterministic tests on timestamps |
 | Secrets | Environment variables / git-ignored `.env`, no credential in the repository | Twelve-factor configuration |
+| Container image | Multi-stage build, layered jar, non-root user, G1 with heap sized from the memory limit | A code change ships one small layer; least privilege; predictable memory |
 
 ## Observability
 
-Actuator runs on a **separate management port** (`8081`), so the public API port never exposes
-`/actuator`. Only `health`, `info`, `metrics` and `prometheus` are exposed; health details are hidden.
+Traces, metrics and logs are exported over **OTLP** (OpenTelemetry) to `grafana/otel-lgtm` in development: one
+container with the OpenTelemetry collector, Tempo (traces), Prometheus (metrics), Loki (logs) and Grafana, started by
+`docker compose up -d`. Changing backend (Grafana Cloud, Datadog, Elastic...) means changing the OTLP endpoints, not
+the code.
+
+| Signal | What you get |
+|---|---|
+| **Traces** | One trace per request: HTTP, every SQL query, and for an order the **asynchronous confirmation** in the same trace (context propagated to the `@Async` thread). Sampling 100 % in development, 10 % by default |
+| **Logs** | Console unchanged, and every log line sent to Loki with its trace and span ids |
+| **Metrics** | Pushed every 10 s in Compose (1 min by default), shown by the *E-commerce — Vue d'ensemble* dashboard |
+| **Errors** | Every RFC 9457 response carries a `traceId`: a reported error leads straight to its trace |
+
+Health probes and SQL run outside of any request (Flyway, connection pool) create no trace. SQL spans never contain
+parameter values.
 
 | Metric | Source |
 |---|---|
 | `ecommerce_orders_placed_total` | Orders committed (counted after commit) |
 | `ecommerce_orders_amount` | Order amounts: count, sum, max (revenue, average basket) |
-| `ecommerce_orders_confirmation_seconds{outcome}` | Duration of the async confirmation, success/failure |
-| `http_server_requests_seconds` | Per-endpoint traffic, status and latency histogram (p95) |
+| `ecommerce_orders_confirmation_milliseconds{outcome}` | Duration of the async confirmation, success/failure |
+| `http_server_requests_milliseconds` | Per-endpoint traffic, status and latency histogram (p95) |
 | `cache_gets_total{result}` | Cache hits and misses |
 | `hikaricp_*`, `executor_*`, `jvm_*` | Connection pool, async pool, JVM |
 
-### Prometheus + Grafana
+Actuator runs on a **separate management port** (`8081`), so the public API port never exposes `/actuator`. Only
+`health`, `info` and `metrics` are exposed; health details are hidden.
 
-```bash
-cp monitoring/.env.example monitoring/.env    # set GRAFANA_ADMIN_PASSWORD
-./mvnw spring-boot:run
-cd monitoring && docker compose up -d
-```
+### Following an order in Grafana
 
-- Prometheus: http://localhost:9090/targets — target `ecommerce` must be **UP**
-- Grafana: http://localhost:3000 — the provisioned *E-commerce — Vue d'ensemble* dashboard shows
-  orders per minute, revenue, average basket, cache hit ratio, p95 latency per endpoint and
-  confirmation duration
+http://localhost:3000 (admin / admin):
 
-The dashboard and datasource are provisioned from files (*dashboard as code*); both containers bind to
-`127.0.0.1` only.
+- **Dashboards → E-commerce → Vue d'ensemble**: orders per minute, revenue, average basket, cache hit ratio, p95
+  latency per endpoint, confirmation duration (provisioned from `observability/grafana`, read-only)
+- **Explore → Tempo**, query `{ resource.service.name = "ecommerce" && span.http.route = "/api/customers/{customerId}/orders" }`:
+  the order trace, with its SQL queries and the `order confirmation` span; **Logs for this span** opens the matching
+  lines in Loki
+- **Explore → Loki**: `{service_name="ecommerce"} | trace_id="<traceId>"` for the logs of one request
+
+`./scripts/smoke.sh` does all of this automatically against the running stack (also run by CI): it places an order,
+then checks the `traceId` of an error, the order trace in Tempo and its confirmation logs in Loki.
 
 ## Tests
 
@@ -203,15 +261,20 @@ The dashboard and datasource are provisioned from files (*dashboard as code*); b
 ./mvnw verify    # + integration tests (Failsafe) + JaCoCo report
 ```
 
+Tests run against a **real PostgreSQL 18** started by Testcontainers (Docker must be running): the
+same Flyway migrations as in production, then Hibernate schema validation. One container per test JVM,
+shared by all Spring contexts.
+
 | Level | Tools | Scope |
 |---|---|---|
 | Entities | JUnit | Aggregate invariants (cart merging, stock, order status) |
 | Services | Mockito | Business rules, events published or not |
-| Repositories | `@DataJpaTest` | Queries, projections, constraints |
+| Repositories | `@DataJpaTest` on PostgreSQL | Migrations, queries, projections, constraints |
 | Controllers | `@WebMvcTest` | Validation, status codes, RFC 9457 payloads |
+| Observability | JUnit, OpenTelemetry SDK (in-memory) | Noise filter, logs exported with their trace id, `traceId` in errors |
 | Integration (`*IT`) | `@SpringBootTest` | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch |
 
-157 tests (140 unit/slice, 17 integration). Coverage report: `target/site/jacoco/index.html`.
+177 tests (158 unit/slice, 19 integration). Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 
@@ -220,12 +283,27 @@ The dashboard and datasource are provisioned from files (*dashboard as code*); b
 | No authentication: any caller can act on any `customerId` | Spring Security with OAuth2/JWT, customer id taken from the token |
 | Confirmation is lost if the app stops between commit and email (order stays `PENDING`) | Transactional outbox + retry, or a message broker |
 | Caffeine is local to one instance | Redis when running several instances |
-| Schema managed by `ddl-auto: update` | Flyway migrations |
 | `name LIKE '%x%'` cannot use a B-tree index | PostgreSQL `pg_trgm` GIN index or full-text search |
-| Case-insensitive name uniqueness is checked in code (race window) | Unique index on `lower(name)` |
 | Async pool grows beyond 2 threads only when its queue (100) is full | Size `core-size` from `executor_queued_tasks` and confirmation latency |
+
+## CI/CD
+
+| Workflow | When | What |
+|---|---|---|
+| [CI](.github/workflows/ci.yml) | Every pull request to `dev`/`main`, every push to `dev` | `build`: `./mvnw verify` (tests on PostgreSQL 18, coverage summary). `smoke`: the Compose stack built and started, then `scripts/smoke.sh` |
+| [Release](.github/workflows/release.yml) | Push to `main`, tag `vX.Y.Z` | Tests again, image scanned by Trivy (no fixable CRITICAL vulnerability), then pushed to Docker Hub for amd64 and arm64 with SBOM and provenance |
+| [Dependabot](.github/dependabot.yml) | Weekly | Update pull requests to `dev`: GitHub Actions, Maven, Dockerfile and Compose images |
+
+Image: [`kardigue/ecommerce-api`](https://hub.docker.com/r/kardigue/ecommerce-api), tags `X.Y.Z`, `X.Y`, `latest` (releases),
+`main` and `sha-<commit>`. Actions are pinned by commit SHA; workflows only read the repository.
+
+To run a published release instead of building locally:
+
+```bash
+IMAGE_NAMESPACE=kardigue IMAGE_TAG=1.1.0 docker compose --profile app up -d --no-build --wait
+```
 
 ## Workflow
 
-- Feature branches merged into `dev` through pull requests; `main` and `dev` are protected
+- Feature branches merged into `dev` through pull requests; `main` and `dev` are protected, CI `build` and `smoke` required
 - [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `test`, `build`, `docs`, `chore`)

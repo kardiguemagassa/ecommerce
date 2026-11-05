@@ -10,6 +10,7 @@ import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.repository.CategoryRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,9 +43,13 @@ public class CategoryService {
     public CategoryResponse create(CategoryRequest request) {
         String name = request.name().strip();
         if (categoryRepository.existsByNameIgnoreCase(name)) {
-            throw new DuplicateResourceException("Category '" + name + "' already exists");
+            throw duplicate(name);
         }
-        return CategoryResponse.from(categoryRepository.save(new Category(name)));
+        try {
+            return CategoryResponse.from(categoryRepository.saveAndFlush(new Category(name)));
+        } catch (DataIntegrityViolationException ex) {
+            throw duplicate(name);
+        }
     }
 
     @Transactional
@@ -53,9 +58,14 @@ public class CategoryService {
         Category category = getCategory(id);
         String name = request.name().strip();
         if (categoryRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
-            throw new DuplicateResourceException("Category '" + name + "' already exists");
+            throw duplicate(name);
         }
         category.setName(name);
+        try {
+            categoryRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw duplicate(name);
+        }
         return CategoryResponse.from(category);
     }
 
@@ -66,6 +76,15 @@ public class CategoryService {
             throw new ResourceInUseException("Category " + id + " still contains products");
         }
         categoryRepository.delete(category);
+    }
+
+    /**
+     * Same error for both paths: the upfront existence check, and the unique index on lower(name)
+     * that catches a concurrent duplicate. Flushing inside the method makes that violation surface
+     * here, not later at commit as a generic integrity error.
+     */
+    private static DuplicateResourceException duplicate(String name) {
+        return new DuplicateResourceException("Category '" + name + "' already exists");
     }
 
     private Category getCategory(Long id) {

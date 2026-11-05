@@ -1,0 +1,13 @@
+# Build context: only what the Dockerfile needs. Faster builds, and no secret ever ends up in a layer.
+target/
+.git/
+.idea/
+*.iml
+.vscode/
+**/*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+http/
+observability/

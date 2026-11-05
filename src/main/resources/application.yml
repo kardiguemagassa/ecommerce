@@ -10,12 +10,10 @@ spring:
     username: ${POSTGRES_USERNAME}
     password: ${POSTGRES_PASSWORD}
 
+  # Schema owned by Flyway (src/main/resources/db/migration); Hibernate only checks it matches the entities
   jpa:
     hibernate:
-      ddl-auto: update
-    properties:
-      hibernate:
-        format_sql: true
+      ddl-auto: validate
     open-in-view: false
 
   data:
@@ -37,7 +35,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, metrics, prometheus
+        include: health, info, metrics
   endpoint:
     health:
       probes:
@@ -49,6 +47,28 @@ management:
     distribution:
       percentiles-histogram:
         http.server.requests: true
+  # Traces over OTLP (HTTP) to the OpenTelemetry collector: Grafana Tempo in development (compose service otel-lgtm).
+  tracing:
+    sampling:
+      # 10 % unless told otherwise (production); compose and .env.example set 100 % for development.
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+    # Logs over OTLP as well (Loki in development), each record with the trace and span ids of the current span.
+    logging:
+      export:
+        otlp:
+          endpoint: ${OTEL_LOGS_ENDPOINT:http://localhost:4318/v1/logs}
+  # Metrics pushed over OTLP (Prometheus in development), instead of being scraped from /actuator/prometheus.
+  otlp:
+    metrics:
+      export:
+        url: ${OTEL_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
+        # Push interval: 1 minute by default (production), 10 s in compose for live dashboards.
+        step: ${OTEL_METRICS_STEP:1m}
 
 springdoc:
   api-docs:
@@ -61,7 +81,9 @@ springdoc:
   paths-to-match: /api/**
   default-produces-media-type: application/json
 
-logging:
-  level:
-    org.hibernate.SQL: DEBUG
+# SQL spans: queries only (no connection or result-set spans), never the parameter values (personal data).
+jdbc:
+  includes: query
+  datasource-proxy:
+    include-parameter-values: false
 
