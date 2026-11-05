@@ -43,7 +43,13 @@
             "CUSTOMER",
             "offline_access",
             "uma_authorization"
-          ]
+          ],
+          "client": {
+            "account": [
+              "view-profile",
+              "manage-account"
+            ]
+          }
         }
       }
     ]
@@ -165,7 +171,7 @@
         }
       ],
       "realmRoles": [
-        "CUSTOMER"
+        "default-roles-ecommerce"
       ]
     },
     {
@@ -183,7 +189,7 @@
         }
       ],
       "realmRoles": [
-        "CUSTOMER",
+        "default-roles-ecommerce",
         "ADMIN"
       ]
     }
