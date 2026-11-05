@@ -22,25 +22,25 @@ consistency, caching, observability and an automated test suite.
 |---|---|
 | Language / runtime | Java 21 |
 | Framework | Spring Boot 4.1 (Spring 7, Hibernate 7, Jackson 3) |
-| Database | PostgreSQL 16, schema versioned with Flyway |
+| Database | PostgreSQL 18, schema versioned with Flyway |
 | Cache | Caffeine (Spring Cache abstraction) |
 | Metrics | Micrometer, Prometheus, Grafana |
 | API docs | springdoc-openapi 3 |
 | Tests | JUnit 5, Mockito, AssertJ, Awaitility, Testcontainers (PostgreSQL), JaCoCo |
 | Build | Maven (Surefire for unit tests, Failsafe for integration tests) |
+| Packaging | Docker multi-stage image (layered, non-root), Docker Compose |
 
 ## Getting started
 
 ### Prerequisites
 
-- Java 21
-- PostgreSQL 16 with an empty database (Flyway creates the schema on startup)
-- Docker, for the tests (Testcontainers) and the monitoring stack
+- Docker: database, tests (Testcontainers), monitoring stack, and optionally the API itself
+- Java 21, to build and run the application outside a container
 
 ### Configuration
 
 Copy the template and fill in your local values. `.env` is git-ignored and loaded automatically
-by Spring (`spring.config.import`).
+by Spring (`spring.config.import`) and by Docker Compose.
 
 ```bash
 cp .env.example .env
@@ -51,13 +51,28 @@ cp .env.example .env
 | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB` | Database location | — |
 | `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database credentials | — |
 | `MANAGEMENT_PORT` | Actuator port | `8081` |
+| `API_PORT` | API port published by Compose | `8080` |
 | `API_DOCS_ENABLED` | Expose OpenAPI + Swagger UI | `true` (set `false` in production) |
 
 ### Run
 
+PostgreSQL always runs in Docker (`compose.yaml`, data kept in the `postgres-data` volume). The API
+runs either from the IDE / Maven, or in a container too:
+
 ```bash
+# Database in Docker, API on the host (hot reload with DevTools)
+docker compose up -d --wait
 ./mvnw spring-boot:run
+
+# Everything in Docker
+docker compose --profile app up -d --build --wait
+
+# Stop (data kept); add -v to delete the database volume
+docker compose --profile app down
 ```
+
+Every port is published on `127.0.0.1` only. The API container runs as a non-root user, with a 512 MB
+memory limit from which the JVM sizes its heap.
 
 | URL | Content |
 |---|---|
@@ -188,6 +203,7 @@ evicts nothing and is not counted.
 | Async work | `@TransactionalEventListener(AFTER_COMMIT)` + `@Async` on a bounded pool | The HTTP response does not wait for the email |
 | Time | Injected `Clock` | Deterministic tests on timestamps |
 | Secrets | Environment variables / git-ignored `.env`, no credential in the repository | Twelve-factor configuration |
+| Container image | Multi-stage build, layered jar, non-root user, G1 with heap sized from the memory limit | A code change ships one small layer; least privilege; predictable memory |
 
 ## Observability
 
@@ -226,7 +242,7 @@ The dashboard and datasource are provisioned from files (*dashboard as code*); b
 ./mvnw verify    # + integration tests (Failsafe) + JaCoCo report
 ```
 
-Tests run against a **real PostgreSQL 16** started by Testcontainers (Docker must be running): the
+Tests run against a **real PostgreSQL 18** started by Testcontainers (Docker must be running): the
 same Flyway migrations as in production, then Hibernate schema validation. One container per test JVM,
 shared by all Spring contexts.
 
