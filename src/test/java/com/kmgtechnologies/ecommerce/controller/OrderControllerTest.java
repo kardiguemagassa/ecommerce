@@ -8,6 +8,13 @@ import com.kmgtechnologies.ecommerce.exception.EmptyCartException;
 import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.service.OrderService;
+import com.kmgtechnologies.ecommerce.security.CurrentCustomer;
+import com.kmgtechnologies.ecommerce.security.SecurityConfig;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +42,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OrderController.class)
+@Import(SecurityConfig.class)
+@WithMockUser(roles = "CUSTOMER")
 class OrderControllerTest {
 
     private static final Instant NOW = Instant.parse("2026-10-22T10:00:00Z");
@@ -49,13 +58,26 @@ class OrderControllerTest {
     @MockitoBean
     private OrderService orderService;
 
+    /** Requests are authenticated by @WithMockUser: no token to decode, no Keycloak. */
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
+
+    /** The signed-in customer is customer 1. */
+    @MockitoBean
+    private CurrentCustomer currentCustomer;
+
+    @BeforeEach
+    void signedInAsCustomer1() {
+        when(currentCustomer.id()).thenReturn(1L);
+    }
+
     @Test
     void placeOrder_returns201WithLocation() throws Exception {
         when(orderService.placeOrder(1L)).thenReturn(ORDER);
 
-        mockMvc.perform(post("/api/customers/1/orders"))
+        mockMvc.perform(post("/api/me/orders"))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", "http://localhost/api/customers/1/orders/7"))
+                .andExpect(header().string("Location", "http://localhost/api/me/orders/7"))
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.totalAmount").value(99.80))
                 .andExpect(jsonPath("$.items[0].productName").value("Keyboard"));
@@ -65,7 +87,7 @@ class OrderControllerTest {
     void placeOrder_returns409WhenCartIsEmpty() throws Exception {
         when(orderService.placeOrder(1L)).thenThrow(new EmptyCartException(1L));
 
-        mockMvc.perform(post("/api/customers/1/orders"))
+        mockMvc.perform(post("/api/me/orders"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Empty cart"));
     }
@@ -74,7 +96,7 @@ class OrderControllerTest {
     void placeOrder_returns409WhenStockIsInsufficient() throws Exception {
         when(orderService.placeOrder(1L)).thenThrow(new InsufficientStockException("Keyboard", 2, 1));
 
-        mockMvc.perform(post("/api/customers/1/orders"))
+        mockMvc.perform(post("/api/me/orders"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Insufficient stock"));
     }
@@ -86,7 +108,7 @@ class OrderControllerTest {
                         List.of(new OrderSummaryResponse(7L, OrderStatus.CONFIRMED, new BigDecimal("99.80"), NOW)),
                         invocation.getArgument(1), 1));
 
-        mockMvc.perform(get("/api/customers/1/orders"))
+        mockMvc.perform(get("/api/me/orders"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.page.totalElements").value(1));
@@ -98,7 +120,7 @@ class OrderControllerTest {
 
     @Test
     void listOrders_rejectsUnknownSortProperty() throws Exception {
-        mockMvc.perform(get("/api/customers/1/orders").param("sort", "customer.email"))
+        mockMvc.perform(get("/api/me/orders").param("sort", "customer.email"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(orderService);
@@ -108,7 +130,7 @@ class OrderControllerTest {
     void getOrder_returnsOrder() throws Exception {
         when(orderService.getOrder(1L, 7L)).thenReturn(ORDER);
 
-        mockMvc.perform(get("/api/customers/1/orders/7"))
+        mockMvc.perform(get("/api/me/orders/7"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(7))
                 .andExpect(jsonPath("$.createdAt").value("2026-10-22T10:00:00Z"));
@@ -116,9 +138,19 @@ class OrderControllerTest {
 
     @Test
     void getOrder_returns404WhenOrderDoesNotBelongToCustomer() throws Exception {
-        when(orderService.getOrder(2L, 7L)).thenThrow(new ResourceNotFoundException("Order", 7L));
+        when(orderService.getOrder(1L, 7L)).thenThrow(new ResourceNotFoundException("Order", 7L));
 
-        mockMvc.perform(get("/api/customers/2/orders/7"))
+        mockMvc.perform(get("/api/me/orders/7"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void orders_requireAuthentication() throws Exception {
+        mockMvc.perform(post("/api/me/orders"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        verifyNoInteractions(orderService, currentCustomer);
     }
 }

@@ -2,6 +2,7 @@ package com.kmgtechnologies.ecommerce.controller;
 
 import com.kmgtechnologies.ecommerce.dto.OrderResponse;
 import com.kmgtechnologies.ecommerce.dto.OrderSummaryResponse;
+import com.kmgtechnologies.ecommerce.security.CurrentCustomer;
 import com.kmgtechnologies.ecommerce.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -26,17 +27,19 @@ import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.BAD_REQUEST;
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.CONFLICT;
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.NOT_FOUND;
 
-@Tag(name = "Orders", description = "Orders placed from the cart, confirmed asynchronously")
+@Tag(name = "Orders", description = "Orders of the signed-in customer, placed from the cart and confirmed asynchronously")
 @RestController
-@RequestMapping("/api/customers/{customerId}/orders")
+@RequestMapping("/api/me/orders")
 public class OrderController {
 
-    private static final Set<String> SORTABLE_PROPERTIES = Set.of("id", "createdAt", "totalAmount");
+    static final Set<String> SORTABLE_PROPERTIES = Set.of("id", "createdAt", "totalAmount");
 
     private final OrderService orderService;
+    private final CurrentCustomer currentCustomer;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, CurrentCustomer currentCustomer) {
         this.orderService = orderService;
+        this.currentCustomer = currentCustomer;
     }
 
     @Operation(summary = "Place an order from the cart",
@@ -48,8 +51,8 @@ public class OrderController {
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @ApiResponse(responseCode = "409", ref = CONFLICT)
     @PostMapping
-    public ResponseEntity<OrderResponse> placeOrder(@PathVariable Long customerId) {
-        OrderResponse order = orderService.placeOrder(customerId);
+    public ResponseEntity<OrderResponse> placeOrder() {
+        OrderResponse order = orderService.placeOrder(currentCustomer.id());
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{orderId}")
                 .buildAndExpand(order.id())
@@ -57,25 +60,24 @@ public class OrderController {
         return ResponseEntity.created(location).body(order);
     }
 
-    @Operation(summary = "List the customer's orders",
+    @Operation(summary = "List my orders",
             description = "Paginated summaries, newest first by default. Sortable properties: id, createdAt, totalAmount.")
     @ApiResponse(responseCode = "200", description = "Page of order summaries returned")
     @ApiResponse(responseCode = "400", ref = BAD_REQUEST)
     @GetMapping
     public PagedModel<OrderSummaryResponse> listOrders(
-            @PathVariable Long customerId,
             @ParameterObject
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         SortValidation.requireAllowed(pageable.getSort(), SORTABLE_PROPERTIES);
-        return new PagedModel<>(orderService.listOrders(customerId, pageable));
+        return new PagedModel<>(orderService.listOrders(currentCustomer.id(), pageable));
     }
 
     @Operation(summary = "Get an order with its lines",
-            description = "Returns 404 if the order does not exist or belongs to another customer.")
+            description = "Returns 404 if the order does not exist or belongs to another customer (no way to tell them apart).")
     @ApiResponse(responseCode = "200", description = "Order found")
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @GetMapping("/{orderId}")
-    public OrderResponse getOrder(@PathVariable Long customerId, @PathVariable Long orderId) {
-        return orderService.getOrder(customerId, orderId);
+    public OrderResponse getOrder(@PathVariable Long orderId) {
+        return orderService.getOrder(currentCustomer.id(), orderId);
     }
 }

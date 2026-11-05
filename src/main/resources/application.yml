@@ -11,6 +11,16 @@ spring:
     password: ${POSTGRES_PASSWORD}
 
   # Schema owned by Flyway (src/main/resources/db/migration); Hibernate only checks it matches the entities
+  # Keycloak access tokens: keys from the JWK set URI (internal Keycloak URL in containers), issuer and audience
+  # checked against the public URL the browser and the tokens use.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/ecommerce}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/ecommerce/protocol/openid-connect/certs}
+          audiences: ecommerce-api
+
   jpa:
     hibernate:
       ddl-auto: validate

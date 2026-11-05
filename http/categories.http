@@ -1,7 +1,17 @@
+# Tokens: see http-client.env.json (first use: ./scripts/dev-token.sh alice@example.com).
 @baseUrl = http://localhost:8080
+
+### Sign in as the shop administrator (token valid 5 minutes: run again when a request answers 401)
+POST {{keycloakUrl}}/realms/ecommerce/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=ecommerce-dev-cli&username={{adminEmail}}&password={{demoPassword}}&scope=openid
+
+> {% client.global.set("adminToken", response.body.access_token); %}
 
 ### Create a category → 201
 POST {{baseUrl}}/api/categories
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "Books"}
@@ -10,12 +20,14 @@ Content-Type: application/json
 
 ### Same name, different case → 409
 POST {{baseUrl}}/api/categories
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "books"}
 
 ### Blank name → 400
 POST {{baseUrl}}/api/categories
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "  "}
@@ -31,9 +43,11 @@ GET {{baseUrl}}/api/categories/999999
 
 ### Rename the category → 200
 PUT {{baseUrl}}/api/categories/{{categoryId}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "Novels"}
 
 ### Delete the category → 204
 DELETE {{baseUrl}}/api/categories/{{categoryId}}
+Authorization: Bearer {{adminToken}}

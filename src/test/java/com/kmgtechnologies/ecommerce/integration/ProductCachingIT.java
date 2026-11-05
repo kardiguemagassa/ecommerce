@@ -2,7 +2,6 @@ package com.kmgtechnologies.ecommerce.integration;
 
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CategoryRequest;
-import com.kmgtechnologies.ecommerce.dto.CustomerRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.TopSellingProductResponse;
 import com.kmgtechnologies.ecommerce.entity.Category;
@@ -12,6 +11,7 @@ import com.kmgtechnologies.ecommerce.repository.CategoryRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
 import com.kmgtechnologies.ecommerce.service.CartService;
 import com.kmgtechnologies.ecommerce.service.CategoryService;
+import com.kmgtechnologies.ecommerce.service.CustomerIdentity;
 import com.kmgtechnologies.ecommerce.service.CustomerService;
 import com.kmgtechnologies.ecommerce.service.OrderService;
 import com.kmgtechnologies.ecommerce.service.ProductService;
@@ -73,8 +73,8 @@ class ProductCachingIT {
     }
 
     private void placeOrder(Product orderedProduct, int quantity) {
-        Long customerId = customerService.create(
-                new CustomerRequest("cache-" + UUID.randomUUID() + "@example.com", "Cache Test")).id();
+        Long customerId = customerService.provision(new CustomerIdentity(
+                UUID.randomUUID().toString(), "cache-" + UUID.randomUUID() + "@example.com", true, "Cache Test")).id();
         cartService.addItem(customerId, new AddCartItemRequest(orderedProduct.getId(), quantity));
         orderService.placeOrder(customerId);
     }

@@ -39,3 +39,6 @@ build/
 
 ### macOS ###
 .DS_Store
+
+### IntelliJ HTTP client secrets ###
+http/http-client.private.env.json
