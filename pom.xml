@@ -10,14 +10,14 @@
     </parent>
     <groupId>com.kmgtechnologies</groupId>
     <artifactId>ecommerce</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <name>ecommerce</name>
     <description>ecommerce</description>
     <properties>
         <java.version>21</java.version>
-        <springdoc.version>3.1.0</springdoc.version>
+        <springdoc.version>3.2.0</springdoc.version>
         <postgresql.version>42.7.14</postgresql.version>
-        <jacoco.version>0.8.14</jacoco.version>
+        <jacoco.version>0.8.16</jacoco.version>
         <!-- SQL spans (JDBC observations); not managed by Spring Boot -->
         <datasource-micrometer.version>2.3.0</datasource-micrometer.version>
         <!-- Logback appender for OTLP logs; not managed by Spring Boot. Must match the OpenTelemetry SDK that Spring Boot
@@ -41,6 +41,15 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <!-- Backend for Frontend: browser login (OAuth2 client) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -130,6 +139,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

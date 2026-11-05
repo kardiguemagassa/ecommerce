@@ -26,6 +26,7 @@ consistency, caching, observability and an automated test suite.
 | Language / runtime | Java 21 |
 | Framework | Spring Boot 4.1 (Spring 7, Hibernate 7, Jackson 3) |
 | Database | PostgreSQL 18, schema versioned with Flyway |
+| Identity | Keycloak 26 (OpenID Connect), realm `ecommerce` |
 | Cache | Caffeine (Spring Cache abstraction) |
 | Observability | Micrometer, OpenTelemetry (OTLP), Grafana LGTM: Tempo, Prometheus, Loki |
 | API docs | springdoc-openapi 3 |
@@ -37,7 +38,7 @@ consistency, caching, observability and an automated test suite.
 
 ### Prerequisites
 
-- Docker: database, observability backend, tests (Testcontainers), and optionally the API itself
+- Docker: database, Keycloak, observability backend, tests (Testcontainers), and optionally the API itself
 - Java 21, to build and run the application outside a container
 
 ### Configuration
@@ -55,12 +56,17 @@ cp .env.example .env
 | `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database credentials | — |
 | `MANAGEMENT_PORT` | Actuator port | `8081` |
 | `API_PORT` | API port published by Compose | `8080` |
+| `KEYCLOAK_PORT`, `KEYCLOAK_ADMIN_USERNAME`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Keycloak and its admin console | `8180` |
+| `BFF_CLIENT_SECRET` | Secret of the confidential client `ecommerce-bff` | — |
+| `DEMO_USER_PASSWORD` | Password of the demo users (12 characters minimum) | — |
+| `SHOP_ADMIN_EMAIL` | E-mail (and username) of the shop administrator, kept out of Git | — |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional Google sign-in (`scripts/keycloak-google.sh`) | — |
 | `TRACING_SAMPLING_PROBABILITY` | Share of requests traced | `0.1` (`1.0` in `.env.example` and Compose) |
 | `API_DOCS_ENABLED` | Expose OpenAPI + Swagger UI | `true` (set `false` in production) |
 
 ### Run
 
-PostgreSQL and the observability backend always run in Docker (`compose.yml`; database data kept in the
+PostgreSQL, Keycloak and the observability backend always run in Docker (`compose.yml`; database data kept in the
 `postgres-data` volume). The API
 runs either from the IDE / Maven, or in a container too:
 
@@ -87,8 +93,44 @@ memory limit from which the JVM sizes its heap.
 | http://localhost:8081/actuator/health | Health, liveness and readiness probes |
 | http://localhost:8081/actuator/metrics | Metrics (also pushed over OTLP) |
 | http://localhost:3000 | Grafana: dashboard, traces, logs (admin / admin) |
+| http://localhost:8180 | Keycloak: admin console (`KEYCLOAK_ADMIN_*`), realm `ecommerce` |
 
-Ready-to-run requests for the IntelliJ HTTP client are in [`http/`](http/).
+Ready-to-run requests for the IntelliJ HTTP client are in [`http/`](http/) (environment `dev`). Each file starts by
+signing in; put the demo password (and your `SHOP_ADMIN_EMAIL` as `adminEmail`) in
+`http/http-client.private.env.json`, git-ignored, and run `./scripts/dev-token.sh alice@example.com` once to create the
+development client.
+
+### Identity provider (Keycloak)
+
+The realm `ecommerce` is imported from [`keycloak/realm-ecommerce.json`](keycloak/realm-ecommerce.json) on the first
+start of Keycloak (an existing realm is never overwritten: `docker compose down` then remove the `keycloak-db-data`
+volume to re-import it). Secrets and passwords are placeholders resolved from `.env` at import: none is in Git.
+
+| Element | Content |
+|---|---|
+| Realm roles | `CUSTOMER` (given to every new user: own cart and orders), `ADMIN` (catalog, customer support) |
+| `ecommerce-bff` | Confidential client of the API: browser login (authorization code + PKCE), tokens kept server-side |
+| `ecommerce-swagger` | Public client of Swagger UI (authorization code + PKCE) |
+| Demo users | `alice@example.com` (`CUSTOMER`) and the shop administrator `SHOP_ADMIN_EMAIL` (`CUSTOMER`, `ADMIN`; `admin@example.com` in `.env.example`), password `DEMO_USER_PASSWORD` |
+| Policies | French login pages, self-registration with the e-mail as username, passwords of 12 characters minimum, brute-force protection, access tokens valid 5 minutes |
+
+Access tokens carry the audience `ecommerce-api` and the realm roles in a `roles` claim.
+
+#### Sign in with Google (optional)
+
+Keycloak brokers the Google login: the application only ever sees Keycloak tokens and sessions, so nothing changes
+in the API. Not part of the versioned realm (no broken button without credentials, no secret in Git), it is added to
+a running Keycloak by a script:
+
+1. Google Cloud console, *Google Auth Platform*: consent screen (external, your account as test user), then an OAuth
+   client of type *Web application* with the authorized redirect URI
+   `http://localhost:8180/realms/ecommerce/broker/google/endpoint`.
+2. `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`.
+3. `./scripts/keycloak-google.sh` (idempotent: adds or updates the provider).
+
+The login page then shows a **Google** button. A first Google login creates the user with the `CUSTOMER` role and a
+verified e-mail; if an account with that e-mail already exists, Keycloak asks its owner to sign in to it once before
+linking the two, so the account keeps its roles.
 
 ### Database migrations
 
@@ -122,14 +164,54 @@ silently skipping V1.
 | `GET` | `/api/products/{id}` | Product details (cached) |
 | `GET` | `/api/products/top-selling?limit=10` | Best sellers (1–50, cached) |
 | `POST` `PUT` `DELETE` | `/api/products[/{id}]` | Product management |
-| `POST` | `/api/customers` | Register a customer |
-| `GET` | `/api/customers/{id}` | Customer details |
-| `GET` `DELETE` | `/api/customers/{customerId}/cart` | Get / empty the cart |
-| `POST` | `/api/customers/{customerId}/cart/items` | Add a product |
-| `DELETE` | `/api/customers/{customerId}/cart/items/{productId}` | Remove a product |
-| `POST` | `/api/customers/{customerId}/orders` | Place an order from the cart |
-| `GET` | `/api/customers/{customerId}/orders` | Order history (paginated, newest first) |
-| `GET` | `/api/customers/{customerId}/orders/{orderId}` | Order with its lines |
+| `GET` | `/api/me` | My customer profile (created on the first call) |
+| `GET` `DELETE` | `/api/me/cart` | Get / empty my cart |
+| `POST` | `/api/me/cart/items` | Add a product |
+| `DELETE` | `/api/me/cart/items/{productId}` | Remove a product |
+| `POST` | `/api/me/orders` | Place an order from my cart |
+| `GET` | `/api/me/orders` | My order history (paginated, newest first) |
+| `GET` | `/api/me/orders/{orderId}` | One of my orders with its lines |
+| `GET` | `/api/admin/customers/{id}[/orders[/{orderId}]]` | Customer support: a customer, their orders |
+
+### Security
+
+Two ways in, one set of rules:
+
+| Client | Authentication | Where the tokens are |
+|---|---|---|
+| Browser (React front-end, v2.0.0) | **Backend for Frontend**: `/oauth2/authorization/keycloak` signs in with Keycloak (authorization code + PKCE, confidential client `ecommerce-bff`), then an `HttpOnly`, `SameSite=Lax` session cookie | On the server only: JavaScript never sees a token |
+| Swagger UI, curl, other services | OAuth2 **resource server**: `Authorization: Bearer <access token>`, checked for signature (realm keys), issuer, audience `ecommerce-api` and expiry | With the client |
+
+Browser sessions:
+
+- `GET /api/me/session` (public) tells the front-end whether it is signed in, with the name, e-mail and roles, never
+  a token; it also sets the `XSRF-TOKEN` cookie.
+- Writes made with the session cookie need that token back in the `X-XSRF-TOKEN` header (CSRF); bearer-token calls
+  are not concerned (a browser never sends a bearer token on its own).
+- `POST /logout` closes the session and answers `{"logoutUrl": ...}`: the Keycloak end-session URL the front-end
+  navigates to, so that single sign-on does not log the user back in.
+- After login and logout the browser lands on `BFF_FRONT_URL` (`/api/me/session` until the front-end exists).
+
+Swagger UI: **Authorize** signs in with Keycloak (public client `ecommerce-swagger`, PKCE), then sends the token
+with every call.
+
+| Routes | Access |
+|---|---|
+| `GET` on products and categories | Public |
+| Writes on products and categories, `/api/admin/**` | Realm role `ADMIN` |
+| `/api/me/**` | Realm role `CUSTOMER` (every user has it) |
+| Anything else | Refused (a new endpoint is closed until a rule opens it) |
+
+There is no sign-up endpoint and no customer id in the URLs: the customer is always the one of the token. Their
+record is created on their first call from the token claims (`sub`, `email`, `name`), and their e-mail and name follow
+Keycloak afterwards. A customer created before authentication is attached to the Keycloak user with the same e-mail,
+only if Keycloak verified that e-mail.
+
+A token of a demo user for curl or scripts (development only, password grant on a local client created on first use):
+
+```bash
+curl -H "Authorization: Bearer $(./scripts/dev-token.sh alice@example.com)" http://localhost:8080/api/me
+```
 
 The full contract, with request/response schemas and error codes, is in Swagger UI.
 
@@ -151,6 +233,8 @@ All errors share the RFC 9457 structure; validation errors add a field-by-field 
 | Status | When |
 |---|---|
 | `400` | Validation error, malformed body, unsupported sort property, page size above 100 |
+| `401` | Missing, invalid or expired token (`code`: `UNAUTHENTICATED`, `WWW-Authenticate: Bearer`) |
+| `403` | Valid token without the required role (`code`: `ACCESS_DENIED`) |
 | `404` | Unknown resource, or an order belonging to another customer |
 | `409` | Duplicate, resource in use, insufficient stock, empty cart, concurrent modification |
 
@@ -246,7 +330,7 @@ http://localhost:3000 (admin / admin):
 
 - **Dashboards → E-commerce → Vue d'ensemble**: orders per minute, revenue, average basket, cache hit ratio, p95
   latency per endpoint, confirmation duration (provisioned from `observability/grafana`, read-only)
-- **Explore → Tempo**, query `{ resource.service.name = "ecommerce" && span.http.route = "/api/customers/{customerId}/orders" }`:
+- **Explore → Tempo**, query `{ resource.service.name = "ecommerce" && span.http.route = "/api/me/orders" }`:
   the order trace, with its SQL queries and the `order confirmation` span; **Logs for this span** opens the matching
   lines in Loki
 - **Explore → Loki**: `{service_name="ecommerce"} | trace_id="<traceId>"` for the logs of one request
@@ -272,15 +356,16 @@ shared by all Spring contexts.
 | Repositories | `@DataJpaTest` on PostgreSQL | Migrations, queries, projections, constraints |
 | Controllers | `@WebMvcTest` | Validation, status codes, RFC 9457 payloads |
 | Observability | JUnit, OpenTelemetry SDK (in-memory) | Noise filter, logs exported with their trace id, `traceId` in errors |
+| Security | `@WebMvcTest` with `@WithMockUser` / `oidcLogin()`, JUnit | 401 / 403 per route, CSRF on session writes, session endpoint, logout URL, roles of the ID token, first-call provisioning |
 | Integration (`*IT`) | `@SpringBootTest` | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch |
 
-177 tests (158 unit/slice, 19 integration). Coverage report: `target/site/jacoco/index.html`.
+208 tests (188 unit/slice, 20 integration). Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 
 | Limitation | Next step |
 |---|---|
-| No authentication: any caller can act on any `customerId` | Spring Security with OAuth2/JWT, customer id taken from the token |
+| In-memory sessions: one API instance, sessions lost on restart | Spring Session with Redis or JDBC when running several instances |
 | Confirmation is lost if the app stops between commit and email (order stays `PENDING`) | Transactional outbox + retry, or a message broker |
 | Caffeine is local to one instance | Redis when running several instances |
 | `name LIKE '%x%'` cannot use a B-tree index | PostgreSQL `pg_trgm` GIN index or full-text search |

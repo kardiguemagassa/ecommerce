@@ -7,6 +7,11 @@ import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.service.ProductService;
+import com.kmgtechnologies.ecommerce.security.BffTestConfiguration;
+import com.kmgtechnologies.ecommerce.security.SecurityConfig;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ProductController.class)
+@Import({SecurityConfig.class, BffTestConfiguration.class})
 @ActiveProfiles("test")
 class ProductControllerTest {
 
@@ -55,6 +61,10 @@ class ProductControllerTest {
 
     @MockitoBean
     private TopSellingProductService topSellingProductService;
+
+    /** Requests are authenticated by @WithMockUser: no token to decode, no Keycloak. */
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @Test
     void search_passesFiltersAndReturnsPagedResponse() throws Exception {
@@ -113,6 +123,7 @@ class ProductControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void create_returns201WithLocation() throws Exception {
         when(productService.create(any(ProductRequest.class))).thenReturn(LAPTOP);
 
@@ -125,6 +136,7 @@ class ProductControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void create_returns400WithAllInvalidFields() throws Exception {
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -141,6 +153,7 @@ class ProductControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void create_returns400WhenPriceHasTooManyDecimals() throws Exception {
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -152,6 +165,7 @@ class ProductControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void update_returnsUpdatedProduct() throws Exception {
         when(productService.update(eq(1L), any(ProductRequest.class))).thenReturn(LAPTOP);
 
@@ -163,6 +177,7 @@ class ProductControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void delete_returns204() throws Exception {
         mockMvc.perform(delete("/api/products/1"))
                 .andExpect(status().isNoContent());
@@ -189,4 +204,27 @@ class ProductControllerTest {
         verifyNoInteractions(topSellingProductService);
     }
 
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void create_isForbiddenToCustomers() throws Exception {
+        mockMvc.perform(post("/api/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LAPTOP_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        verifyNoInteractions(productService);
+    }
+
+    @Test
+    void update_requiresAuthentication() throws Exception {
+        mockMvc.perform(put("/api/products/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(LAPTOP_JSON))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        verifyNoInteractions(productService);
+    }
 }

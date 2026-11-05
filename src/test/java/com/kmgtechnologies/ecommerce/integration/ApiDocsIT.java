@@ -42,9 +42,18 @@ class ApiDocsIT {
     }
 
     @Test
-    void groupsEndpointsUnderTheFiveBusinessTags() {
+    void groupsEndpointsUnderTheBusinessTagsAndTheSession() {
         List<String> tags = apiDocs.read("$.tags[*].name");
-        assertThat(tags).containsExactlyInAnyOrder("Cart", "Categories", "Customers", "Orders", "Products");
+        assertThat(tags).containsExactlyInAnyOrder("Cart", "Categories", "Customers", "Orders", "Products", "Session");
+    }
+
+    @Test
+    void swaggerUiSignsInWithKeycloak() {
+        assertThat(apiDocs.read("$.components.securitySchemes.keycloak.type", String.class)).isEqualTo("oauth2");
+        assertThat(apiDocs.read("$.components.securitySchemes.keycloak.flows.authorizationCode.authorizationUrl",
+                String.class)).isEqualTo("http://localhost:8180/realms/ecommerce/protocol/openid-connect/auth");
+        List<Object> requirements = apiDocs.read("$.security[*].keycloak");
+        assertThat(requirements).hasSize(1);
     }
 
     @Test

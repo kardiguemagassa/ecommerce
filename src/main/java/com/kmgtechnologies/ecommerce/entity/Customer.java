@@ -21,10 +21,33 @@ public class Customer {
     @Column(nullable = false, length = 100)
     private String fullName;
 
+    /** Subject of the Keycloak user ({@code sub}); null for customers created before authentication existed. */
+    @Column(unique = true)
+    private String externalId;
+
     protected Customer() {
     }
 
     public Customer(String email, String fullName) {
+        this(null, email, fullName);
+    }
+
+    public Customer(String externalId, String email, String fullName) {
+        this.externalId = externalId;
+        this.email = email;
+        this.fullName = fullName;
+    }
+
+    /** Attaches a customer created before authentication to its Keycloak user (same verified e-mail). */
+    public void linkTo(String externalId) {
+        if (this.externalId != null) {
+            throw new IllegalStateException("Customer " + id + " is already linked to a user");
+        }
+        this.externalId = externalId;
+    }
+
+    /** Keycloak owns the profile: e-mail and name are copied from the token (no write when unchanged). */
+    public void updateProfile(String email, String fullName) {
         this.email = email;
         this.fullName = fullName;
     }
@@ -39,6 +62,10 @@ public class Customer {
 
     public String getFullName() {
         return fullName;
+    }
+
+    public String getExternalId() {
+        return externalId;
     }
 
     @Override

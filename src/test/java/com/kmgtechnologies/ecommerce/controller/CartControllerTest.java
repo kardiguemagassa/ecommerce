@@ -7,6 +7,15 @@ import com.kmgtechnologies.ecommerce.dto.CartResponse;
 import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.service.CartService;
+import com.kmgtechnologies.ecommerce.security.CurrentCustomer;
+import com.kmgtechnologies.ecommerce.security.BffTestConfiguration;
+import com.kmgtechnologies.ecommerce.security.SecurityConfig;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -18,6 +27,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -29,6 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(CartController.class)
+@Import({SecurityConfig.class, BffTestConfiguration.class})
+@WithMockUser(roles = "CUSTOMER")
 @ActiveProfiles("test")
 class CartControllerTest {
 
@@ -44,11 +56,24 @@ class CartControllerTest {
     @MockitoBean
     private CartService cartService;
 
+    /** Requests are authenticated by @WithMockUser: no token to decode, no Keycloak. */
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
+
+    /** The signed-in customer is customer 1. */
+    @MockitoBean
+    private CurrentCustomer currentCustomer;
+
+    @BeforeEach
+    void signedInAsCustomer1() {
+        when(currentCustomer.id()).thenReturn(1L);
+    }
+
     @Test
     void getCart_returnsCart() throws Exception {
         when(cartService.getCart(1L)).thenReturn(CART_WITH_LAPTOP);
 
-        mockMvc.perform(get("/api/customers/1/cart"))
+        mockMvc.perform(get("/api/me/cart"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.customerId").value(1))
                 .andExpect(jsonPath("$.items[0].productName").value("Laptop"))
@@ -58,18 +83,10 @@ class CartControllerTest {
     }
 
     @Test
-    void getCart_returns404WhenCustomerDoesNotExist() throws Exception {
-        when(cartService.getCart(99L)).thenThrow(new ResourceNotFoundException("Customer", 99L));
-
-        mockMvc.perform(get("/api/customers/99/cart"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
     void addItem_returnsUpdatedCart() throws Exception {
         when(cartService.addItem(eq(1L), any(AddCartItemRequest.class))).thenReturn(CART_WITH_LAPTOP);
 
-        mockMvc.perform(post("/api/customers/1/cart/items")
+        mockMvc.perform(post("/api/me/cart/items")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"productId": 10, "quantity": 2}
@@ -80,7 +97,7 @@ class CartControllerTest {
 
     @Test
     void addItem_returns400WhenRequestIsInvalid() throws Exception {
-        mockMvc.perform(post("/api/customers/1/cart/items")
+        mockMvc.perform(post("/api/me/cart/items")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity": 0}
@@ -97,7 +114,7 @@ class CartControllerTest {
         when(cartService.addItem(eq(1L), any(AddCartItemRequest.class)))
                 .thenThrow(new InsufficientStockException("Laptop", 11, 10));
 
-        mockMvc.perform(post("/api/customers/1/cart/items")
+        mockMvc.perform(post("/api/me/cart/items")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"productId": 10, "quantity": 11}
@@ -110,7 +127,7 @@ class CartControllerTest {
     void removeItem_returnsUpdatedCart() throws Exception {
         when(cartService.removeItem(1L, 10L)).thenReturn(CartResponse.empty(1L));
 
-        mockMvc.perform(delete("/api/customers/1/cart/items/10"))
+        mockMvc.perform(delete("/api/me/cart/items/10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isEmpty())
                 .andExpect(jsonPath("$.total").value(0));
@@ -121,16 +138,64 @@ class CartControllerTest {
         when(cartService.removeItem(1L, 10L))
                 .thenThrow(new ResourceNotFoundException("Product 10 is not in the cart"));
 
-        mockMvc.perform(delete("/api/customers/1/cart/items/10"))
+        mockMvc.perform(delete("/api/me/cart/items/10"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Product 10 is not in the cart"));
     }
 
     @Test
     void clear_returns204() throws Exception {
-        mockMvc.perform(delete("/api/customers/1/cart"))
+        mockMvc.perform(delete("/api/me/cart"))
                 .andExpect(status().isNoContent());
 
         verify(cartService).clear(1L);
+    }
+
+    @Test
+    @WithAnonymousUser
+    void cart_requiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/me/cart"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        verifyNoInteractions(cartService, currentCustomer);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void cart_requiresTheCustomerRole() throws Exception {
+        mockMvc.perform(get("/api/me/cart"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        verifyNoInteractions(cartService, currentCustomer);
+    }
+
+    @Test
+    void browserSessionWriteWithoutCsrfToken_isRefused() throws Exception {
+        mockMvc.perform(post("/api/me/cart/items")
+                        .cookie(new Cookie("JSESSIONID", "session-id"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productId": 10, "quantity": 2}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        verifyNoInteractions(cartService);
+    }
+
+    @Test
+    void browserSessionWriteWithCsrfToken_isAccepted() throws Exception {
+        when(cartService.addItem(eq(1L), any(AddCartItemRequest.class))).thenReturn(CART_WITH_LAPTOP);
+
+        mockMvc.perform(post("/api/me/cart/items")
+                        .cookie(new Cookie("JSESSIONID", "session-id"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productId": 10, "quantity": 2}
+                                """))
+                .andExpect(status().isOk());
     }
 }

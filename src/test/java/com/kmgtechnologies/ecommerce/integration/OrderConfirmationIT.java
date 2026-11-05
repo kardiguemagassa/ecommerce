@@ -1,7 +1,6 @@
 package com.kmgtechnologies.ecommerce.integration;
 
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
-import com.kmgtechnologies.ecommerce.dto.CustomerRequest;
 import com.kmgtechnologies.ecommerce.dto.OrderResponse;
 import com.kmgtechnologies.ecommerce.entity.Category;
 import com.kmgtechnologies.ecommerce.entity.OrderStatus;
@@ -12,6 +11,7 @@ import com.kmgtechnologies.ecommerce.repository.CategoryRepository;
 import com.kmgtechnologies.ecommerce.repository.OrderRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
 import com.kmgtechnologies.ecommerce.service.CartService;
+import com.kmgtechnologies.ecommerce.service.CustomerIdentity;
 import com.kmgtechnologies.ecommerce.service.CustomerService;
 import com.kmgtechnologies.ecommerce.service.OrderService;
 import org.junit.jupiter.api.Test;
@@ -65,7 +65,8 @@ class OrderConfirmationIT {
         Product product = productRepository.save(
                 new Product("Keyboard", null, new BigDecimal("49.90"), stock, category));
         String email = "async-" + suffix + "@example.com";
-        Long customerId = customerService.create(new CustomerRequest(email, "Async Test")).id();
+        Long customerId = customerService.provision(
+                new CustomerIdentity(UUID.randomUUID().toString(), email, true, "Async Test")).id();
         cartService.addItem(customerId, new AddCartItemRequest(product.getId(), quantity));
         return new Scenario(customerId, email, product);
     }
