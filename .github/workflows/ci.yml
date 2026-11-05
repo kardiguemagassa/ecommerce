@@ -30,6 +30,9 @@ jobs:
       # Unit tests, then integration tests against a real PostgreSQL 18 container (Testcontainers).
       - name: Verify
         run: ./mvnw --batch-mode --no-transfer-progress verify
+      # The React client is generated from frontend/openapi.json: it must match the API just built (ApiDocsIT export).
+      - name: OpenAPI contract of the front-end
+        run: node frontend/scripts/openapi.mjs check target/openapi.json
       - name: Coverage summary
         if: ${{ !cancelled() }}
         run: |
@@ -54,6 +57,32 @@ jobs:
             target/surefire-reports/
             target/failsafe-reports/
           retention-days: 7
+
+  # React front-end: lint, types (client generated from openapi.json), unit tests, production build.
+  frontend:
+    name: frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        run: npm ci --no-audit
+      - name: Lint
+        run: npm run lint
+      - name: Types
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
 
   # The image as it will be released, started with Compose: database, API, observability backend.
   smoke:

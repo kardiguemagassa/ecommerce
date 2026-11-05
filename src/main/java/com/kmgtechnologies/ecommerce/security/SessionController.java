@@ -2,6 +2,7 @@ package com.kmgtechnologies.ecommerce.security;
 
 import com.kmgtechnologies.ecommerce.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.core.Authentication;
@@ -36,7 +37,7 @@ public class SessionController {
                     the returned `logoutUrl`. `avatarUrl`: profile photo for the navigation bar, null without one.""")
     @ApiResponse(responseCode = "200", description = "Session state, and the XSRF-TOKEN cookie")
     @GetMapping("/api/me/session")
-    public Session session(Authentication authentication, CsrfToken csrf) {
+    public Session session(Authentication authentication, @Parameter(hidden = true) CsrfToken csrf) {
         csrf.getToken(); // writes the XSRF-TOKEN cookie (tokens are generated lazily)
         if (authentication == null || !(authentication.getPrincipal() instanceof OidcUser user)) {
             return Session.ANONYMOUS;

@@ -1,0 +1,5 @@
+node_modules/
+dist/
+coverage/
+# Generated from openapi.json by `npm run api:types` (run before dev, build, lint, typecheck and test)
+src/api/schema.d.ts

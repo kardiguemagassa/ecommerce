@@ -1,0 +1,1557 @@
+{
+  "components": {
+    "responses": {
+      "BadRequest": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetail"
+            }
+          }
+        },
+        "description": "Invalid request: validation errors (detailed in `errors`), malformed body or unsupported parameter"
+      },
+      "Conflict": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetail"
+            }
+          }
+        },
+        "description": "Business rule violation (duplicate, resource in use, insufficient stock, empty cart) or concurrent modification"
+      },
+      "ImageRejected": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetail"
+            }
+          }
+        },
+        "description": "Image refused: too heavy (413), not a JPEG, PNG or WebP image (415), damaged or too many pixels (422)"
+      },
+      "NotFound": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetail"
+            }
+          }
+        },
+        "description": "Resource not found"
+      },
+      "StorageUnavailable": {
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetail"
+            }
+          }
+        },
+        "description": "Media storage unreachable: nothing was changed, retry later"
+      }
+    },
+    "schemas": {
+      "AddCartItemRequest": {
+        "properties": {
+          "productId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "quantity": {
+            "exclusiveMinimum": true,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "productId",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "CartItemResponse": {
+        "properties": {
+          "imageUrl": {
+            "type": "string"
+          },
+          "productId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "quantity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "CartResponse": {
+        "properties": {
+          "customerId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CartItemResponse"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "number"
+          },
+          "totalQuantity": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CategoryRequest": {
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "CategoryResponse": {
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CustomerResponse": {
+        "properties": {
+          "avatarUrl": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "OrderItemResponse": {
+        "properties": {
+          "productId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "quantity": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "OrderResponse": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "customerId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrderItemResponse"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "CONFIRMED"
+            ],
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "OrderSummaryResponse": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "CONFIRMED"
+            ],
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "PageMetadata": {
+        "properties": {
+          "number": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalElements": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number",
+          "size",
+          "totalElements",
+          "totalPages"
+        ],
+        "type": "object"
+      },
+      "PagedModelOrderSummaryResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/OrderSummaryResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "content",
+          "page"
+        ],
+        "type": "object"
+      },
+      "PagedModelProductResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/ProductResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "content",
+          "page"
+        ],
+        "type": "object"
+      },
+      "ProblemDetail": {
+        "description": "RFC 9457 problem details",
+        "properties": {
+          "code": {
+            "description": "Stable error code for the front-end, when the status alone is ambiguous (UNAUTHENTICATED, ACCESS_DENIED, IMAGE_TOO_LARGE, UNSUPPORTED_IMAGE, INVALID_IMAGE, STORAGE_UNAVAILABLE)",
+            "example": "UNSUPPORTED_IMAGE",
+            "type": "string"
+          },
+          "detail": {
+            "example": "Product with id 42 not found",
+            "type": "string"
+          },
+          "errors": {
+            "description": "Field validation errors, keyed by field name (400 only)",
+            "example": "{price=must be greater than 0}",
+            "type": "object"
+          },
+          "instance": {
+            "example": "/api/products/42",
+            "type": "string"
+          },
+          "status": {
+            "example": 404,
+            "format": "int32",
+            "type": "integer"
+          },
+          "title": {
+            "example": "Not Found",
+            "type": "string"
+          },
+          "traceId": {
+            "description": "Trace of the request, to quote to the support",
+            "example": "4bf92f3577b34da6a3ce929d0e0e4736",
+            "type": "string"
+          },
+          "type": {
+            "example": "about:blank",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProductRequest": {
+        "properties": {
+          "categoryId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "description": {
+            "maxLength": 2000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 150,
+            "minLength": 0,
+            "type": "string"
+          },
+          "price": {
+            "exclusiveMinimum": false,
+            "minimum": 0.01,
+            "type": "number"
+          },
+          "stock": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "categoryId",
+          "name",
+          "price",
+          "stock"
+        ],
+        "type": "object"
+      },
+      "ProductResponse": {
+        "properties": {
+          "categoryId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "categoryName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "stock": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "Session": {
+        "properties": {
+          "authenticated": {
+            "type": "boolean"
+          },
+          "avatarUrl": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "TopSellingProductResponse": {
+        "properties": {
+          "productId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "totalQuantity": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "keycloak": {
+        "description": "Keycloak sign-in (authorization code with PKCE, client ecommerce-swagger)",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "http://localhost:8180/realms/ecommerce/protocol/openid-connect/auth",
+            "scopes": {
+              "openid": "OpenID Connect sign-in"
+            },
+            "tokenUrl": "http://localhost:8180/realms/ecommerce/protocol/openid-connect/token"
+          }
+        },
+        "type": "oauth2"
+      }
+    }
+  },
+  "info": {
+    "contact": {
+      "name": "Kardigué Magassa",
+      "url": "https://github.com/kardiguemagassa"
+    },
+    "description": "Simplified e-commerce backend: product catalog with search and caching,\nshopping cart, and orders with asynchronous confirmation.\nErrors follow RFC 9457 (application/problem+json).",
+    "title": "E-commerce API"
+  },
+  "openapi": "3.0.1",
+  "paths": {
+    "/api/admin/customers/{id}": {
+      "get": {
+        "operationId": "findById_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerResponse"
+                }
+              }
+            },
+            "description": "Customer found"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Get a customer (administrators)",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/admin/customers/{id}/orders": {
+      "get": {
+        "description": "Paginated summaries, newest first by default. Sortable properties: id, createdAt, totalAmount.",
+        "operationId": "listOrders_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Zero-based page index (0..N)",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The size of the page to be returned",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": [
+                "createdAt,DESC"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedModelOrderSummaryResponse"
+                }
+              }
+            },
+            "description": "Page of order summaries returned"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        },
+        "summary": "List the orders of a customer (administrators)",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/admin/customers/{id}/orders/{orderId}": {
+      "get": {
+        "operationId": "getOrder_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            },
+            "description": "Order found"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Get an order of a customer (administrators)",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "operationId": "findAll",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Categories returned"
+          }
+        },
+        "summary": "List all categories",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "post": {
+        "description": "Category names are unique (case-insensitive).",
+        "operationId": "create_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryResponse"
+                }
+              }
+            },
+            "description": "Category created; URI in the Location header"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Create a category",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/api/categories/{id}": {
+      "delete": {
+        "description": "Rejected with 409 while products still belong to it.",
+        "operationId": "delete_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Category deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Delete a category",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "get": {
+        "operationId": "findById_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryResponse"
+                }
+              }
+            },
+            "description": "Category found"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Get a category by id",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "put": {
+        "description": "Evicts the product cache, as cached products embed the category name.",
+        "operationId": "update_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryResponse"
+                }
+              }
+            },
+            "description": "Category updated"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Rename a category",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/api/me": {
+      "get": {
+        "description": "Created on the first call from the Keycloak user; e-mail and name follow Keycloak.",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerResponse"
+                }
+              }
+            },
+            "description": "Profile of the signed-in customer"
+          }
+        },
+        "summary": "My customer profile",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/me/avatar": {
+      "delete": {
+        "description": "The photo is erased from the storage.",
+        "operationId": "deleteAvatar",
+        "responses": {
+          "204": {
+            "description": "Photo deleted (or there was none)"
+          }
+        },
+        "summary": "Delete my profile photo",
+        "tags": [
+          "Customers"
+        ]
+      },
+      "put": {
+        "description": "Optional photo, shown next to the name in the navigation bar. Multipart field `file`: JPEG, PNG or WebP, 1 MB at most (format read from the content). Stored as a square JPEG of 256 x 256 at most (centred crop), without the metadata of the upload (EXIF, GPS). The previous photo is deleted.",
+        "operationId": "replaceAvatar",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerResponse"
+                }
+              }
+            },
+            "description": "Photo stored; profile with its new `avatarUrl`"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/ImageRejected"
+          },
+          "415": {
+            "$ref": "#/components/responses/ImageRejected"
+          },
+          "422": {
+            "$ref": "#/components/responses/ImageRejected"
+          },
+          "503": {
+            "$ref": "#/components/responses/StorageUnavailable"
+          }
+        },
+        "summary": "Replace my profile photo",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/me/cart": {
+      "delete": {
+        "operationId": "clear",
+        "responses": {
+          "204": {
+            "description": "Cart emptied"
+          }
+        },
+        "summary": "Empty the cart",
+        "tags": [
+          "Cart"
+        ]
+      },
+      "get": {
+        "description": "Lines with subtotals and the cart total.",
+        "operationId": "getCart",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            },
+            "description": "Cart returned (empty if nothing was added yet)"
+          }
+        },
+        "summary": "Get the cart",
+        "tags": [
+          "Cart"
+        ]
+      }
+    },
+    "/api/me/cart/items": {
+      "post": {
+        "description": "Creates the cart on first use. Adding a product already in the cart increases its quantity.",
+        "operationId": "addItem",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCartItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            },
+            "description": "Updated cart"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Add a product to the cart",
+        "tags": [
+          "Cart"
+        ]
+      }
+    },
+    "/api/me/cart/items/{productId}": {
+      "delete": {
+        "operationId": "removeItem",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            },
+            "description": "Updated cart"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Remove a product from the cart",
+        "tags": [
+          "Cart"
+        ]
+      }
+    },
+    "/api/me/orders": {
+      "get": {
+        "description": "Paginated summaries, newest first by default. Sortable properties: id, createdAt, totalAmount.",
+        "operationId": "listOrders",
+        "parameters": [
+          {
+            "description": "Zero-based page index (0..N)",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The size of the page to be returned",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": [
+                "createdAt,DESC"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedModelOrderSummaryResponse"
+                }
+              }
+            },
+            "description": "Page of order summaries returned"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        },
+        "summary": "List my orders",
+        "tags": [
+          "Orders"
+        ]
+      },
+      "post": {
+        "description": "Atomically snapshots prices, decrements stock and empties the cart. The order is returned with status PENDING; a confirmation email is sent asynchronously after commit, then the status becomes CONFIRMED.",
+        "operationId": "placeOrder",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            },
+            "description": "Order created (PENDING); URI in the Location header"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Place an order from the cart",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/me/orders/{orderId}": {
+      "get": {
+        "description": "Returns 404 if the order does not exist or belongs to another customer (no way to tell them apart).",
+        "operationId": "getOrder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            },
+            "description": "Order found"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Get an order with its lines",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/me/session": {
+      "get": {
+        "description": "Public: answers `authenticated: false` without a session. Sign in by navigating to `/oauth2/authorization/keycloak`, sign out with `POST /logout` (CSRF header), then navigate to the returned `logoutUrl`. `avatarUrl`: profile photo for the navigation bar, null without one.",
+        "operationId": "session",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            },
+            "description": "Session state, and the XSRF-TOKEN cookie"
+          }
+        },
+        "summary": "The browser session",
+        "tags": [
+          "Session"
+        ]
+      }
+    },
+    "/api/products": {
+      "get": {
+        "description": "Paginated search, optionally filtered by category and name. Sortable properties: id, name, price, stock. Maximum page size: 100.",
+        "operationId": "search",
+        "parameters": [
+          {
+            "description": "Only products of this category",
+            "in": "query",
+            "name": "categoryId",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Case-insensitive substring of the product name",
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Zero-based page index (0..N)",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The size of the page to be returned",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": [
+                "name,ASC"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedModelProductResponse"
+                }
+              }
+            },
+            "description": "Page of products returned"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        },
+        "summary": "Search products",
+        "tags": [
+          "Products"
+        ]
+      },
+      "post": {
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "Product created; URI in the Location header"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Create a product",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/products/top-selling": {
+      "get": {
+        "description": "Ranked by total quantity ordered. Cached for 5 minutes.",
+        "operationId": "topSelling",
+        "parameters": [
+          {
+            "description": "Number of products to return (1-50)",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "format": "int32",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TopSellingProductResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Ranking returned"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        },
+        "summary": "Best-selling products",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/products/{id}": {
+      "delete": {
+        "description": "Evicts the cached product and deletes its image.",
+        "operationId": "delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Product deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Delete a product",
+        "tags": [
+          "Products"
+        ]
+      },
+      "get": {
+        "description": "Served from cache when available (10-minute TTL).",
+        "operationId": "findById",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "Product found"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Get a product by id",
+        "tags": [
+          "Products"
+        ]
+      },
+      "put": {
+        "description": "Evicts the cached product. Returns 409 on concurrent modification (optimistic locking).",
+        "operationId": "update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "Product updated"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Update a product",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/products/{id}/image": {
+      "delete": {
+        "operationId": "deleteImage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Image removed (or there was none)"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Remove the image of a product",
+        "tags": [
+          "Products"
+        ]
+      },
+      "put": {
+        "description": "Multipart field `file`: JPEG, PNG or WebP, 2 MB at most (format read from the content). Stored as a JPEG of 1200 x 900 at most (4:3, centred crop, never enlarged), without the metadata of the upload (EXIF, GPS). The previous image is deleted. Returns the product with its new `imageUrl`.",
+        "operationId": "replaceImage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "Image stored"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/ImageRejected"
+          },
+          "415": {
+            "$ref": "#/components/responses/ImageRejected"
+          },
+          "422": {
+            "$ref": "#/components/responses/ImageRejected"
+          },
+          "503": {
+            "$ref": "#/components/responses/StorageUnavailable"
+          }
+        },
+        "summary": "Replace the image of a product",
+        "tags": [
+          "Products"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "keycloak": []
+    }
+  ],
+  "tags": [
+    {
+      "description": "The signed-in customer, and customer support for administrators",
+      "name": "Customers"
+    },
+    {
+      "description": "Cart of the signed-in customer (one cart per customer)",
+      "name": "Cart"
+    },
+    {
+      "description": "Product catalog: search, details (cached), management, images and best sellers",
+      "name": "Products"
+    },
+    {
+      "description": "Product categories",
+      "name": "Categories"
+    },
+    {
+      "description": "Orders of the signed-in customer, placed from the cart and confirmed asynchronously",
+      "name": "Orders"
+    },
+    {
+      "description": "Browser session of the Backend for Frontend",
+      "name": "Session"
+    }
+  ]
+}
