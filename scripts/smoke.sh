@@ -4,16 +4,22 @@
 #   1. an error response carries the id of its trace
 #   2. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
 #   3. the confirmation log lines of that trace reach Loki
+# and that Keycloak serves the "ecommerce" realm.
 # Grafana's data source proxy is used for Tempo and Loki (admin/admin, development backend only).
 set -euo pipefail
 
 API=${API_URL:-http://localhost:8080/api}
 GRAFANA=${GRAFANA_URL:-http://admin:admin@localhost:3000}/api/datasources/proxy/uid
+KEYCLOAK=${KEYCLOAK_URL:-http://localhost:${KEYCLOAK_PORT:-8180}}
 ATTEMPTS=${ATTEMPTS:-30}
 
 json() { python3 -c "import json, sys; print(json.load(sys.stdin)$1)"; }
 post() { curl -fsS -H 'Content-Type: application/json' -d "$2" "$API$1"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
+
+issuer=$(curl -fsS "$KEYCLOAK/realms/ecommerce/.well-known/openid-configuration" | json "['issuer']")
+[ "$issuer" = "$KEYCLOAK/realms/ecommerce" ] || fail "Keycloak realm ecommerce: unexpected issuer $issuer"
+echo "OK  Keycloak realm ecommerce, issuer $issuer"
 
 suffix=$(date +%s%N)
 category=$(post /categories "{\"name\":\"Smoke $suffix\"}" | json "['id']")
@@ -32,6 +38,8 @@ for _ in $(seq 1 "$ATTEMPTS"); do
   trace=$(curl -fsS -G "$GRAFANA/tempo/api/search" \
             --data-urlencode "q={ name = \"order confirmation\" && span.order.id = \"$order\" }" 2>/dev/null \
           | json ".get('traces', [{}])[0].get('traceID', '')" 2>/dev/null) || trace=""
+  # Tempo drops the leading zeros of trace ids in search results; logs carry the full 32 hex digits.
+  [ -n "$trace" ] && trace=$(printf '%32s' "$trace" | tr ' ' 0)
   [ -n "$trace" ] && break
   sleep 3
 done

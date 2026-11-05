@@ -26,6 +26,7 @@ consistency, caching, observability and an automated test suite.
 | Language / runtime | Java 21 |
 | Framework | Spring Boot 4.1 (Spring 7, Hibernate 7, Jackson 3) |
 | Database | PostgreSQL 18, schema versioned with Flyway |
+| Identity | Keycloak 26 (OpenID Connect), realm `ecommerce` |
 | Cache | Caffeine (Spring Cache abstraction) |
 | Observability | Micrometer, OpenTelemetry (OTLP), Grafana LGTM: Tempo, Prometheus, Loki |
 | API docs | springdoc-openapi 3 |
@@ -37,7 +38,7 @@ consistency, caching, observability and an automated test suite.
 
 ### Prerequisites
 
-- Docker: database, observability backend, tests (Testcontainers), and optionally the API itself
+- Docker: database, Keycloak, observability backend, tests (Testcontainers), and optionally the API itself
 - Java 21, to build and run the application outside a container
 
 ### Configuration
@@ -55,12 +56,16 @@ cp .env.example .env
 | `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database credentials | — |
 | `MANAGEMENT_PORT` | Actuator port | `8081` |
 | `API_PORT` | API port published by Compose | `8080` |
+| `KEYCLOAK_PORT`, `KEYCLOAK_ADMIN_USERNAME`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Keycloak and its admin console | `8180` |
+| `BFF_CLIENT_SECRET` | Secret of the confidential client `ecommerce-bff` | — |
+| `DEMO_USER_PASSWORD` | Password of the demo users (12 characters minimum) | — |
+| `SHOP_ADMIN_EMAIL` | E-mail (and username) of the shop administrator, kept out of Git | — |
 | `TRACING_SAMPLING_PROBABILITY` | Share of requests traced | `0.1` (`1.0` in `.env.example` and Compose) |
 | `API_DOCS_ENABLED` | Expose OpenAPI + Swagger UI | `true` (set `false` in production) |
 
 ### Run
 
-PostgreSQL and the observability backend always run in Docker (`compose.yml`; database data kept in the
+PostgreSQL, Keycloak and the observability backend always run in Docker (`compose.yml`; database data kept in the
 `postgres-data` volume). The API
 runs either from the IDE / Maven, or in a container too:
 
@@ -87,8 +92,25 @@ memory limit from which the JVM sizes its heap.
 | http://localhost:8081/actuator/health | Health, liveness and readiness probes |
 | http://localhost:8081/actuator/metrics | Metrics (also pushed over OTLP) |
 | http://localhost:3000 | Grafana: dashboard, traces, logs (admin / admin) |
+| http://localhost:8180 | Keycloak: admin console (`KEYCLOAK_ADMIN_*`), realm `ecommerce` |
 
 Ready-to-run requests for the IntelliJ HTTP client are in [`http/`](http/).
+
+### Identity provider (Keycloak)
+
+The realm `ecommerce` is imported from [`keycloak/realm-ecommerce.json`](keycloak/realm-ecommerce.json) on the first
+start of Keycloak (an existing realm is never overwritten: `docker compose down` then remove the `keycloak-db-data`
+volume to re-import it). Secrets and passwords are placeholders resolved from `.env` at import: none is in Git.
+
+| Element | Content |
+|---|---|
+| Realm roles | `CUSTOMER` (given to every new user: own cart and orders), `ADMIN` (catalog, customer support) |
+| `ecommerce-bff` | Confidential client of the API: browser login (authorization code + PKCE), tokens kept server-side |
+| `ecommerce-swagger` | Public client of Swagger UI (authorization code + PKCE) |
+| Demo users | `alice@example.com` (`CUSTOMER`) and the shop administrator `SHOP_ADMIN_EMAIL` (`CUSTOMER`, `ADMIN`; `admin@example.com` in `.env.example`), password `DEMO_USER_PASSWORD` |
+| Policies | French login pages, self-registration with the e-mail as username, passwords of 12 characters minimum, brute-force protection, access tokens valid 5 minutes |
+
+Access tokens carry the audience `ecommerce-api` and the realm roles in a `roles` claim.
 
 ### Database migrations
 
