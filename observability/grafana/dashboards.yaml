@@ -1,0 +1,11 @@
+# Grafana provisioning of the dashboard, mounted into otel-lgtm (compose.yml).
+# The dashboard is code: edited here, reviewed in pull requests, loaded at startup; read-only in Grafana.
+apiVersion: 1
+providers:
+  - name: ecommerce
+    folder: E-commerce
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/grafana/conf/provisioning/dashboards/ecommerce

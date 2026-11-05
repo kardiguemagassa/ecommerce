@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.RestClient;
@@ -17,9 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * how Actuator is exposed. Kept apart from @IntegrationTest because
  * it needs a RANDOM_PORT web environment instead of the default MOCK.
  */
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "management.prometheus.metrics.export.enabled=true")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class ActuatorIT {
 
@@ -42,18 +39,37 @@ class ActuatorIT {
     }
 
     @Test
-    void prometheus_exposesBusinessAndCacheMetrics_withApplicationTag() {
-        String body = restClient.get()
-                .uri("http://localhost:{port}/actuator/prometheus", managementPort)
-                .accept(MediaType.TEXT_PLAIN)
+    void metrics_registerBusinessAndCacheMeters() {
+        String names = restClient.get()
+                .uri("http://localhost:{port}/actuator/metrics", managementPort)
                 .retrieve()
                 .body(String.class);
 
-        assertThat(body)
-                .contains("ecommerce_orders_placed_total{application=\"ecommerce\"}")
-                .contains("ecommerce_orders_amount_count")
-                .contains("cache_gets_total")
-                .contains("name=\"products\"");
+        assertThat(names)
+                .contains("\"ecommerce.orders.placed\"")
+                .contains("\"ecommerce.orders.amount\"")
+                .contains("\"cache.gets\"");
+    }
+
+    @Test
+    void metrics_carryTheApplicationTag() {
+        String placed = restClient.get()
+                .uri("http://localhost:{port}/actuator/metrics/ecommerce.orders.placed", managementPort)
+                .retrieve()
+                .body(String.class);
+
+        assertThat(placed).contains("\"tag\":\"application\"").contains("\"ecommerce\"");
+    }
+
+    @Test
+    void prometheusEndpoint_isGone_metricsArePushedOverOtlp() {
+        ResponseEntity<Void> response = restClient.get()
+                .uri("http://localhost:{port}/actuator/prometheus", managementPort)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (request, res) -> { })
+                .toBodilessEntity();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
