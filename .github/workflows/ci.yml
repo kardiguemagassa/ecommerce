@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev]
+
+# Least privilege: the jobs only read the repository.
+permissions:
+  contents: read
+
+# A new push cancels the run still in progress for the same pull request or branch.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # Unit tests, then integration tests against a real PostgreSQL 18 container (Testcontainers).
+      - name: Verify
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: |
+          f=target/site/jacoco/jacoco.csv
+          [ -f "$f" ] || exit 0
+          awk -F, 'NR > 1 { bm += $6; bc += $7; lm += $8; lc += $9 }
+            END { printf "### Test coverage (unit and integration tests)\n\n| Lines | Branches |\n|---|---|\n| %.1f%% | %.1f%% |\n",
+                  100 * lc / (lm + lc), (bm + bc) ? 100 * bc / (bm + bc) : 100 }' "$f" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-report
+          path: target/site/jacoco/
+          retention-days: 7
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports/
+            target/failsafe-reports/
+          retention-days: 7
+
+  # The image as it will be released, started with Compose: database, API, observability backend.
+  smoke:
+    name: smoke
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Throwaway database credentials for this run only: nothing is stored as a secret, nothing is logged.
+      - name: Create .env
+        run: |
+          cp .env.example .env
+          for key in POSTGRES_USERNAME POSTGRES_PASSWORD; do
+            value="u$(openssl rand -hex 12)"
+            echo "::add-mask::$value"
+            sed -i "s|^${key}=.*|${key}=${value}|" .env
+          done
+      - name: Start the stack
+        run: docker compose --profile app up -d --build --wait --wait-timeout 300
+      # An order placed through the API, its trace read back from Tempo and its logs from Loki.
+      - name: Smoke test
+        run: ./scripts/smoke.sh
+      - name: Container logs
+        if: failure()
+        run: docker compose --profile app logs --no-color --tail=200
+      - name: Stop the stack
+        if: always()
+        run: docker compose --profile app down -v

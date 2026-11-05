@@ -1,0 +1,34 @@
+# Weekly update pull requests, opened against dev like any other change.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+  - package-ecosystem: maven
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+    ignore:
+      # Paired with the OpenTelemetry SDK that Spring Boot manages (see opentelemetry-instrumentation.version in
+      # pom.xml): a newer appender needs a newer SDK and fails at runtime. Updated with Spring Boot, by hand.
+      - dependency-name: io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0
+    groups:
+      maven-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+  # Images run by compose.yml (PostgreSQL, grafana/otel-lgtm)
+  - package-ecosystem: docker-compose
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly

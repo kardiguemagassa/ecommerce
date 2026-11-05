@@ -1,5 +1,8 @@
 # E-commerce Backend — Spring Boot 4
 
+[![CI](https://github.com/kardiguemagassa/ecommerce/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/kardiguemagassa/ecommerce/actions/workflows/ci.yml)
+[![Release](https://github.com/kardiguemagassa/ecommerce/actions/workflows/release.yml/badge.svg)](https://github.com/kardiguemagassa/ecommerce/actions/workflows/release.yml)
+
 A simplified e-commerce REST API: product catalog with search and caching, shopping cart, and orders
 confirmed asynchronously. Built as a production-minded showcase: query optimization, transactional
 consistency, caching, observability and an automated test suite.
@@ -248,6 +251,9 @@ http://localhost:3000 (admin / admin):
   lines in Loki
 - **Explore → Loki**: `{service_name="ecommerce"} | trace_id="<traceId>"` for the logs of one request
 
+`./scripts/smoke.sh` does all of this automatically against the running stack (also run by CI): it places an order,
+then checks the `traceId` of an error, the order trace in Tempo and its confirmation logs in Loki.
+
 ## Tests
 
 ```bash
@@ -280,7 +286,24 @@ shared by all Spring contexts.
 | `name LIKE '%x%'` cannot use a B-tree index | PostgreSQL `pg_trgm` GIN index or full-text search |
 | Async pool grows beyond 2 threads only when its queue (100) is full | Size `core-size` from `executor_queued_tasks` and confirmation latency |
 
+## CI/CD
+
+| Workflow | When | What |
+|---|---|---|
+| [CI](.github/workflows/ci.yml) | Every pull request to `dev`/`main`, every push to `dev` | `build`: `./mvnw verify` (tests on PostgreSQL 18, coverage summary). `smoke`: the Compose stack built and started, then `scripts/smoke.sh` |
+| [Release](.github/workflows/release.yml) | Push to `main`, tag `vX.Y.Z` | Tests again, image scanned by Trivy (no fixable CRITICAL vulnerability), then pushed to Docker Hub for amd64 and arm64 with SBOM and provenance |
+| [Dependabot](.github/dependabot.yml) | Weekly | Update pull requests to `dev`: GitHub Actions, Maven, Dockerfile and Compose images |
+
+Image: [`kardigue/ecommerce-api`](https://hub.docker.com/r/kardigue/ecommerce-api), tags `X.Y.Z`, `X.Y`, `latest` (releases),
+`main` and `sha-<commit>`. Actions are pinned by commit SHA; workflows only read the repository.
+
+To run a published release instead of building locally:
+
+```bash
+IMAGE_NAMESPACE=kardigue IMAGE_TAG=1.1.0 docker compose --profile app up -d --no-build --wait
+```
+
 ## Workflow
 
-- Feature branches merged into `dev` through pull requests; `main` and `dev` are protected
+- Feature branches merged into `dev` through pull requests; `main` and `dev` are protected, CI `build` and `smoke` required
 - [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `test`, `build`, `docs`, `chore`)
