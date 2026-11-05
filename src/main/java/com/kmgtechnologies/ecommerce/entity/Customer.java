@@ -25,6 +25,10 @@ public class Customer {
     @Column(unique = true)
     private String externalId;
 
+    /** Object key of the profile photo in the media storage; null without photo. */
+    @Column(length = 200)
+    private String avatarKey;
+
     protected Customer() {
     }
 
@@ -66,6 +70,14 @@ public class Customer {
 
     public String getExternalId() {
         return externalId;
+    }
+
+    public String getAvatarKey() {
+        return avatarKey;
+    }
+
+    public void setAvatarKey(String avatarKey) {
+        this.avatarKey = avatarKey;
     }
 
     @Override

@@ -146,6 +146,27 @@ class GlobalExceptionHandlerTest {
         void optimisticLock() {
             throw new ObjectOptimisticLockingFailureException("Product", 10L);
         }
+
+        @GetMapping("/image-too-large")
+        void imageTooLarge() {
+            throw new ImageTooLargeException(2 * 1024 * 1024);
+        }
+
+        @GetMapping("/unsupported-image")
+        void unsupportedImage() {
+            throw new UnsupportedImageException();
+        }
+
+        @GetMapping("/invalid-image")
+        void invalidImage() {
+            throw new InvalidImageException("The image cannot be read");
+        }
+
+        @GetMapping("/storage-down")
+        void storageDown() {
+            throw new StorageUnavailableException("The media storage is unavailable, please retry later",
+                    new IllegalStateException("connection refused to internal-host:8333"));
+        }
     }
 
     record Payload(@NotBlank String name) {
@@ -177,5 +198,35 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get("/test/optimistic-lock"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.title").value("Concurrent modification"));
+    }
+
+    @Test
+    void imageTooLarge_returns413WithItsCode() throws Exception {
+        mockMvc.perform(get("/test/image-too-large"))
+                .andExpect(status().is(413))
+                .andExpect(jsonPath("$.code").value("IMAGE_TOO_LARGE"))
+                .andExpect(jsonPath("$.detail").value("The image must not exceed 2 MB"));
+    }
+
+    @Test
+    void unsupportedImage_returns415WithItsCode() throws Exception {
+        mockMvc.perform(get("/test/unsupported-image"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_IMAGE"));
+    }
+
+    @Test
+    void invalidImage_returns422WithItsCode() throws Exception {
+        mockMvc.perform(get("/test/invalid-image"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.code").value("INVALID_IMAGE"));
+    }
+
+    @Test
+    void storageOutage_returns503WithoutLeakingTheStorageAddress() throws Exception {
+        mockMvc.perform(get("/test/storage-down"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("STORAGE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.detail", not(containsString("internal-host"))));
     }
 }

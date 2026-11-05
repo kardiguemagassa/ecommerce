@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.security;
 
+import com.kmgtechnologies.ecommerce.service.CustomerService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -10,6 +11,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
@@ -27,6 +30,9 @@ class SessionControllerTest {
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
+    @MockitoBean
+    private CustomerService customerService;
+
     @Test
     void anonymousBrowserIsToldItIsNotSignedIn_andGetsTheCsrfCookie() throws Exception {
         mockMvc.perform(get("/api/me/session"))
@@ -35,10 +41,14 @@ class SessionControllerTest {
                 .andExpect(jsonPath("$.roles").isEmpty())
                 .andExpect(cookie().exists("XSRF-TOKEN"))
                 .andExpect(cookie().httpOnly("XSRF-TOKEN", false));
+
+        verifyNoInteractions(customerService);
     }
 
     @Test
-    void signedInBrowserGetsItsNameEmailAndRoles_neverAToken() throws Exception {
+    void signedInBrowserGetsItsNameEmailRolesAndPhoto_neverAToken() throws Exception {
+        when(customerService.findAvatarUrl("alice")).thenReturn("http://media.test/avatars/alice.jpg");
+
         mockMvc.perform(get("/api/me/session").with(oidcLogin()
                         .idToken(token -> token.subject("alice")
                                 .claim("name", "Alice Martin")
@@ -50,6 +60,7 @@ class SessionControllerTest {
                 .andExpect(jsonPath("$.name").value("Alice Martin"))
                 .andExpect(jsonPath("$.email").value("alice@example.com"))
                 .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"))
-                .andExpect(jsonPath("$.roles.length()").value(1));
+                .andExpect(jsonPath("$.roles.length()").value(1))
+                .andExpect(jsonPath("$.avatarUrl").value("http://media.test/avatars/alice.jpg"));
     }
 }

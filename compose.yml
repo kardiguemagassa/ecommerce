@@ -1,6 +1,6 @@
 name: ecommerce
 
-# "docker compose up -d" starts the database, Keycloak and the observability backend (application run from the IDE
+# "docker compose up -d" starts the database, Keycloak, the media storage and the observability backend (application run from the IDE
 # or ./mvnw spring-boot:run); "docker compose --profile app up -d --build --wait" starts the API container as well.
 # Values come from .env (see .env.example): no credential in this file.
 
@@ -48,15 +48,23 @@ services:
       OTEL_METRICS_ENDPOINT: http://otel-lgtm:4318/v1/metrics
       OTEL_LOGS_ENDPOINT: http://otel-lgtm:4318/v1/logs
       OTEL_METRICS_STEP: 10s
+      # Images and avatars: S3 API of the media service on the compose network; browsers read the bucket on the
+      # published port (nginx /media in v2.0.0).
+      MEDIA_ENDPOINT: http://media:8333
+      MEDIA_ACCESS_KEY: ${MEDIA_ACCESS_KEY:?MEDIA_ACCESS_KEY is required}
+      MEDIA_SECRET_KEY: ${MEDIA_SECRET_KEY:?MEDIA_SECRET_KEY is required}
+      MEDIA_PUBLIC_URL: http://localhost:${MEDIA_PORT:-8333}/ecommerce-media
     ports:
       - "127.0.0.1:${API_PORT:-8080}:8080"
       # Actuator (health, info, metrics), loopback only.
       - "127.0.0.1:${MANAGEMENT_PORT:-8081}:8081"
-    networks: [default, db-net]
+    networks: [default, db-net, media-net]
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
+        condition: service_healthy
+      media:
         condition: service_healthy
     deploy:
       resources:
@@ -125,6 +133,30 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # Media storage (product images, avatars): SeaweedFS in single-process mode ("weed mini"), S3 API on port 8333.
+  # The credentials from .env are its only identity (administrator); the API makes the bucket's objects publicly
+  # readable at startup (bucket policy: GetObject only). Production: any S3 provider, same API.
+  media:
+    image: chrislusf/seaweedfs:4.52
+    command: ["mini", "-dir=/data", "-webdav=false", "-s3.port.iceberg=0", "-s3.port.lance=0"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${MEDIA_ACCESS_KEY:?MEDIA_ACCESS_KEY is required}
+      AWS_SECRET_ACCESS_KEY: ${MEDIA_SECRET_KEY:?MEDIA_SECRET_KEY is required}
+      S3_BUCKET: ecommerce-media
+    ports:
+      # Loopback only: the API started on the host, and browsers reading the images.
+      - "127.0.0.1:${MEDIA_PORT:-8333}:8333"
+    volumes:
+      - media-data:/data
+    networks: [default, media-net]
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8333/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
   # Observability backend for development, in one container: OpenTelemetry collector (OTLP), Tempo (traces),
   # Prometheus (metrics), Loki (logs) and Grafana. Not a production setup: no persistence, default admin account.
   otel-lgtm:
@@ -147,7 +179,10 @@ networks:
   db-net:
   # Keycloak and its database only.
   keycloak-net:
+  # The media storage and the API.
+  media-net:
 
 volumes:
   postgres-data:
   keycloak-db-data:
+  media-data:

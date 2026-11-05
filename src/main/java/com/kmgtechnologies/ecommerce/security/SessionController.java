@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.security;
 
+import com.kmgtechnologies.ecommerce.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,11 +23,17 @@ public class SessionController {
 
     static final String ROLE_PREFIX = "ROLE_";
 
+    private final CustomerService customerService;
+
+    public SessionController(CustomerService customerService) {
+        this.customerService = customerService;
+    }
+
     @Operation(summary = "The browser session",
             description = """
                     Public: answers `authenticated: false` without a session. Sign in by navigating to \
                     `/oauth2/authorization/keycloak`, sign out with `POST /logout` (CSRF header), then navigate to \
-                    the returned `logoutUrl`.""")
+                    the returned `logoutUrl`. `avatarUrl`: profile photo for the navigation bar, null without one.""")
     @ApiResponse(responseCode = "200", description = "Session state, and the XSRF-TOKEN cookie")
     @GetMapping("/api/me/session")
     public Session session(Authentication authentication, CsrfToken csrf) {
@@ -40,11 +47,12 @@ public class SessionController {
                 .map(authority -> authority.substring(ROLE_PREFIX.length()))
                 .sorted()
                 .toList();
-        return new Session(true, user.getFullName(), user.getEmail(), roles);
+        return new Session(true, user.getFullName(), user.getEmail(), roles,
+                customerService.findAvatarUrl(user.getSubject()));
     }
 
-    public record Session(boolean authenticated, String name, String email, List<String> roles) {
+    public record Session(boolean authenticated, String name, String email, List<String> roles, String avatarUrl) {
 
-        static final Session ANONYMOUS = new Session(false, null, null, List.of());
+        static final Session ANONYMOUS = new Session(false, null, null, List.of(), null);
     }
 }

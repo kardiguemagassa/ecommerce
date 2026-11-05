@@ -1,6 +1,5 @@
 package com.kmgtechnologies.ecommerce.repository;
 
-import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.entity.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,8 +12,8 @@ import java.util.Optional;
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query(value = """
-            SELECT new com.kmgtechnologies.ecommerce.dto.ProductResponse(
-                p.id, p.name, p.description, p.price, p.stock, c.id, c.name)
+            SELECT new com.kmgtechnologies.ecommerce.repository.ProductRow(
+                p.id, p.name, p.description, p.price, p.stock, c.id, c.name, p.imageKey)
             FROM Product p
             JOIN p.category c
             WHERE (:categoryId is null or c.id = :categoryId)
@@ -26,16 +25,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             WHERE (:categoryId is null or p.category.id = :categoryId)
               AND lower(p.name) like lower(concat('%', :name, '%'))
             """)
-    Page<ProductResponse> search (@Param("categoryId") Long categoryId, @Param("name") String name, Pageable pageable);
+    Page<ProductRow> search(@Param("categoryId") Long categoryId, @Param("name") String name, Pageable pageable);
 
     boolean existsByCategoryId(Long categoryId);
 
     @Query("""
-            select new com.kmgtechnologies.ecommerce.dto.ProductResponse(
-                p.id, p.name, p.description, p.price, p.stock, c.id, c.name)
+            select new com.kmgtechnologies.ecommerce.repository.ProductRow(
+                p.id, p.name, p.description, p.price, p.stock, c.id, c.name, p.imageKey)
             from Product p
             join p.category c
             where p.id = :id
             """)
-    Optional<ProductResponse> findResponseById(@Param("id") Long id);
+    Optional<ProductRow> findRowById(@Param("id") Long id);
 }

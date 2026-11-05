@@ -8,6 +8,7 @@ import com.kmgtechnologies.ecommerce.entity.Customer;
 import com.kmgtechnologies.ecommerce.entity.Product;
 import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
+import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CartRepository;
 import com.kmgtechnologies.ecommerce.repository.CustomerRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
@@ -43,6 +44,9 @@ class CartServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private MediaUrls mediaUrls;
 
     @InjectMocks
     private CartService cartService;

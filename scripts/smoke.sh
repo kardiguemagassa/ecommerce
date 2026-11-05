@@ -4,9 +4,10 @@
 #   1. Keycloak serves the "ecommerce" realm; the API refuses anonymous (401) and under-privileged (403) calls
 #   2. the shop administrator creates a product, the customer alice@example.com orders it through /api/me
 #   3. the browser login of the BFF: Keycloak login form, session cookie, CSRF on writes, logout at Keycloak
-#   4. an error response carries the id of its trace
-#   5. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
-#   6. the confirmation log lines of that trace reach Loki
+#   4. images: product image and avatar uploaded, re-encoded as JPEG, served by the media storage, deleted
+#   5. an error response carries the id of its trace
+#   6. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
+#   7. the confirmation log lines of that trace reach Loki
 # Tokens of the demo users come from scripts/dev-token.sh (password grant on a development-only client).
 # Grafana's data source proxy is used for Tempo and Loki (admin/admin, development backend only).
 set -euo pipefail
@@ -81,7 +82,8 @@ echo "OK  customer profile from the token, order $order placed through /api/me"
 # --- Browser login through the API (BFF), as a browser would do it ----------------------------------------------
 BASE=${API%/api}
 jar=$(mktemp)
-trap 'rm -f "$jar"' EXIT
+image=$(mktemp)
+trap 'rm -f "$jar" "$image"' EXIT
 browser() { curl -sS -c "$jar" -b "$jar" "$@"; }
 form_action() { python3 -c "import html, re, sys; m = re.search(r'action=\"([^\"]+)\"', sys.stdin.read()); print(html.unescape(m.group(1)) if m else '')"; }
 
@@ -110,6 +112,41 @@ case "$(json "['logoutUrl']" <<< "$logout")" in
 esac
 [ "$(browser "$API/me/session" | json "['authenticated']")" = False ] || fail "BFF logout: session still open"
 echo "OK  logout closes the session and points to the Keycloak end-session endpoint"
+
+# --- Images: uploaded through the API, read from the media storage ------------------------------------------------
+# upload PATH TOKEN FILE: multipart PUT, prints the body, then the HTTP status on the last line
+upload() { curl -sS -X PUT -w '\n%{http_code}' -H "Authorization: Bearer $2" -F "file=@$3" "$API$1"; }
+# A 800 x 400 PNG, written with the Python standard library.
+python3 -c "
+import struct, sys, zlib
+w, h = 800, 400
+rows = b''.join(b'\\x00' + bytes([200, 80, 40]) * w for _ in range(h))
+chunk = lambda kind, data: struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+sys.stdout.buffer.write(b'\\x89PNG\\r\\n\\x1a\\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+                       + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))" > "$image"
+
+response=$(upload "/products/$product/image" "$ALICE" "$image")
+expect "$response" 403 "product image uploaded by a customer"
+response=$(upload "/products/$product/image" "$ADMIN" "$image")
+expect "$response" 200 "product image uploaded by the administrator"
+image_url=$(body "$response" | json "['imageUrl']")
+[ "$(curl -fsS "$API/products/$product" | json "['imageUrl']")" = "$image_url" ] || fail "product read without its new image"
+content_type=$(curl -fsS -o /dev/null -w '%{content_type}' "$image_url") || fail "product image not served at $image_url"
+[ "$content_type" = image/jpeg ] || fail "product image served as $content_type instead of image/jpeg"
+echo "OK  product image stored and re-encoded as JPEG, public at $image_url"
+
+echo 'not an image' > "$image.txt"
+response=$(upload /me/avatar "$ALICE" "$image.txt"); rm -f "$image.txt"
+expect "$response" 415 "text file sent as avatar"
+response=$(upload /me/avatar "$ALICE" "$image")
+expect "$response" 200 "avatar uploaded"
+avatar_url=$(body "$response" | json "['avatarUrl']")
+curl -fsS -o /dev/null "$avatar_url" || fail "avatar not served at $avatar_url"
+expect "$(call DELETE /me/avatar "$ALICE")" 204 "avatar deleted"
+code=$(curl -sS -o /dev/null -w '%{http_code}' "$avatar_url")
+[ "$code" != 200 ] || fail "deleted avatar still served at $avatar_url"
+[ "$(body "$(call GET /me "$ALICE")" | json "['avatarUrl']")" = None ] || fail "profile still has an avatar"
+echo "OK  avatar: other files refused (415), stored, then erased from the storage"
 
 # --- Observability -------------------------------------------------------------------------------------------------
 error_trace=$(body "$(call GET /categories/999999999 none)" | json ".get('traceId', '')")
