@@ -1,7 +1,17 @@
+# Tokens: see http-client.env.json (first use: ./scripts/dev-token.sh alice@example.com).
 @baseUrl = http://localhost:8080
+
+### Sign in as the shop administrator (token valid 5 minutes: run again when a request answers 401)
+POST {{keycloakUrl}}/realms/ecommerce/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=ecommerce-dev-cli&username={{adminEmail}}&password={{demoPassword}}&scope=openid
+
+> {% client.global.set("adminToken", response.body.access_token); %}
 
 ### Create a category for the products → 201
 POST {{baseUrl}}/api/categories
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "Electronics"}
@@ -10,6 +20,7 @@ Content-Type: application/json
 
 ### Create a product → 201
 POST {{baseUrl}}/api/products
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "Laptop", "description": "15 inch", "price": 999.99, "stock": 10, "categoryId": {{categoryId}}}
@@ -18,6 +29,7 @@ Content-Type: application/json
 
 ### Invalid product → 400
 POST {{baseUrl}}/api/products
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "", "price": 0, "stock": -1}
@@ -39,15 +51,19 @@ GET {{baseUrl}}/api/products/{{productId}}
 
 ### Update the product → 200
 PUT {{baseUrl}}/api/products/{{productId}}
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "Laptop Pro", "description": "16 inch", "price": 1499.00, "stock": 5, "categoryId": {{categoryId}}}
 
 ### Delete the category while it has products → 409
 DELETE {{baseUrl}}/api/categories/{{categoryId}}
+Authorization: Bearer {{adminToken}}
 
 ### Delete the product → 204
 DELETE {{baseUrl}}/api/products/{{productId}}
+Authorization: Bearer {{adminToken}}
 
 ### Delete the now empty category → 204
 DELETE {{baseUrl}}/api/categories/{{categoryId}}
+Authorization: Bearer {{adminToken}}

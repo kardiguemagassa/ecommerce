@@ -2,6 +2,7 @@ package com.kmgtechnologies.ecommerce.controller;
 
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CartResponse;
+import com.kmgtechnologies.ecommerce.security.CurrentCustomer;
 import com.kmgtechnologies.ecommerce.service.CartService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -20,23 +21,24 @@ import org.springframework.web.bind.annotation.RestController;
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.BAD_REQUEST;
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.NOT_FOUND;
 
-@Tag(name = "Cart", description = "Shopping cart of a customer (one cart per customer)")
+@Tag(name = "Cart", description = "Cart of the signed-in customer (one cart per customer)")
 @RestController
-@RequestMapping("/api/customers/{customerId}/cart")
+@RequestMapping("/api/me/cart")
 public class CartController {
 
     private final CartService cartService;
+    private final CurrentCustomer currentCustomer;
 
-    public CartController(CartService cartService) {
+    public CartController(CartService cartService, CurrentCustomer currentCustomer) {
         this.cartService = cartService;
+        this.currentCustomer = currentCustomer;
     }
 
     @Operation(summary = "Get the cart", description = "Lines with subtotals and the cart total.")
     @ApiResponse(responseCode = "200", description = "Cart returned (empty if nothing was added yet)")
-    @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @GetMapping
-    public CartResponse getCart(@PathVariable Long customerId) {
-        return cartService.getCart(customerId);
+    public CartResponse getCart() {
+        return cartService.getCart(currentCustomer.id());
     }
 
     @Operation(summary = "Add a product to the cart",
@@ -45,24 +47,23 @@ public class CartController {
     @ApiResponse(responseCode = "400", ref = BAD_REQUEST)
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @PostMapping("/items")
-    public CartResponse addItem(@PathVariable Long customerId, @Valid @RequestBody AddCartItemRequest request) {
-        return cartService.addItem(customerId, request);
+    public CartResponse addItem(@Valid @RequestBody AddCartItemRequest request) {
+        return cartService.addItem(currentCustomer.id(), request);
     }
 
     @Operation(summary = "Remove a product from the cart")
     @ApiResponse(responseCode = "200", description = "Updated cart")
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @DeleteMapping("/items/{productId}")
-    public CartResponse removeItem(@PathVariable Long customerId, @PathVariable Long productId) {
-        return cartService.removeItem(customerId, productId);
+    public CartResponse removeItem(@PathVariable Long productId) {
+        return cartService.removeItem(currentCustomer.id(), productId);
     }
 
     @Operation(summary = "Empty the cart")
     @ApiResponse(responseCode = "204", description = "Cart emptied")
-    @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void clear(@PathVariable Long customerId) {
-        cartService.clear(customerId);
+    public void clear() {
+        cartService.clear(currentCustomer.id());
     }
 }

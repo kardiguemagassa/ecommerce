@@ -1,7 +1,25 @@
+# Tokens: see http-client.env.json (first use: ./scripts/dev-token.sh alice@example.com).
 @baseUrl = http://localhost:8080
+
+### Sign in as the shop administrator (token valid 5 minutes: run again when a request answers 401)
+POST {{keycloakUrl}}/realms/ecommerce/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=ecommerce-dev-cli&username={{adminEmail}}&password={{demoPassword}}&scope=openid
+
+> {% client.global.set("adminToken", response.body.access_token); %}
+
+### Sign in as the customer alice@example.com
+POST {{keycloakUrl}}/realms/ecommerce/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=ecommerce-dev-cli&username={{customerEmail}}&password={{demoPassword}}&scope=openid
+
+> {% client.global.set("customerToken", response.body.access_token); %}
 
 ### Create a category → 201
 POST {{baseUrl}}/api/categories
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "Cart demo {{$timestamp}}"}
@@ -10,55 +28,56 @@ Content-Type: application/json
 
 ### Create a product with a stock of 5 → 201
 POST {{baseUrl}}/api/products
+Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
 {"name": "Keyboard", "price": 49.90, "stock": 5, "categoryId": {{categoryId}}}
 
 > {% client.global.set("productId", response.body.id); %}
 
-### Create a customer → 201
-POST {{baseUrl}}/api/customers
-Content-Type: application/json
-
-{"email": "alice-{{$timestamp}}@example.com", "fullName": "Alice"}
-
-> {% client.global.set("customerId", response.body.id); %}
-
 ### Get the cart before any item (empty) → 200
-GET {{baseUrl}}/api/customers/{{customerId}}/cart
+GET {{baseUrl}}/api/me/cart
+Authorization: Bearer {{customerToken}}
 
 ### Add 2 keyboards → 200 (total 99.80)
-POST {{baseUrl}}/api/customers/{{customerId}}/cart/items
+POST {{baseUrl}}/api/me/cart/items
+Authorization: Bearer {{customerToken}}
 Content-Type: application/json
 
 {"productId": {{productId}}, "quantity": 2}
 
 ### Add 2 more keyboards (same line, quantity 4) → 200 (total 199.60)
-POST {{baseUrl}}/api/customers/{{customerId}}/cart/items
+POST {{baseUrl}}/api/me/cart/items
+Authorization: Bearer {{customerToken}}
 Content-Type: application/json
 
 {"productId": {{productId}}, "quantity": 2}
 
 ### Add 2 more: 6 > stock of 5 → 409
-POST {{baseUrl}}/api/customers/{{customerId}}/cart/items
+POST {{baseUrl}}/api/me/cart/items
+Authorization: Bearer {{customerToken}}
 Content-Type: application/json
 
 {"productId": {{productId}}, "quantity": 2}
 
 ### Invalid quantity → 400
-POST {{baseUrl}}/api/customers/{{customerId}}/cart/items
+POST {{baseUrl}}/api/me/cart/items
+Authorization: Bearer {{customerToken}}
 Content-Type: application/json
 
 {"productId": {{productId}}, "quantity": 0}
 
 ### Remove the product line → 200
-DELETE {{baseUrl}}/api/customers/{{customerId}}/cart/items/{{productId}}
+DELETE {{baseUrl}}/api/me/cart/items/{{productId}}
+Authorization: Bearer {{customerToken}}
 
 ### Remove it again → 404
-DELETE {{baseUrl}}/api/customers/{{customerId}}/cart/items/{{productId}}
+DELETE {{baseUrl}}/api/me/cart/items/{{productId}}
+Authorization: Bearer {{customerToken}}
 
 ### Clear the cart → 204
-DELETE {{baseUrl}}/api/customers/{{customerId}}/cart
+DELETE {{baseUrl}}/api/me/cart
+Authorization: Bearer {{customerToken}}
 
-### Unknown customer → 404
-GET {{baseUrl}}/api/customers/999999/cart
+### Without token → 401 (code UNAUTHENTICATED)
+GET {{baseUrl}}/api/me/cart

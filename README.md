@@ -94,7 +94,10 @@ memory limit from which the JVM sizes its heap.
 | http://localhost:3000 | Grafana: dashboard, traces, logs (admin / admin) |
 | http://localhost:8180 | Keycloak: admin console (`KEYCLOAK_ADMIN_*`), realm `ecommerce` |
 
-Ready-to-run requests for the IntelliJ HTTP client are in [`http/`](http/).
+Ready-to-run requests for the IntelliJ HTTP client are in [`http/`](http/) (environment `dev`). Each file starts by
+signing in; put the demo password (and your `SHOP_ADMIN_EMAIL` as `adminEmail`) in
+`http/http-client.private.env.json`, git-ignored, and run `./scripts/dev-token.sh alice@example.com` once to create the
+development client.
 
 ### Identity provider (Keycloak)
 
@@ -144,14 +147,37 @@ silently skipping V1.
 | `GET` | `/api/products/{id}` | Product details (cached) |
 | `GET` | `/api/products/top-selling?limit=10` | Best sellers (1–50, cached) |
 | `POST` `PUT` `DELETE` | `/api/products[/{id}]` | Product management |
-| `POST` | `/api/customers` | Register a customer |
-| `GET` | `/api/customers/{id}` | Customer details |
-| `GET` `DELETE` | `/api/customers/{customerId}/cart` | Get / empty the cart |
-| `POST` | `/api/customers/{customerId}/cart/items` | Add a product |
-| `DELETE` | `/api/customers/{customerId}/cart/items/{productId}` | Remove a product |
-| `POST` | `/api/customers/{customerId}/orders` | Place an order from the cart |
-| `GET` | `/api/customers/{customerId}/orders` | Order history (paginated, newest first) |
-| `GET` | `/api/customers/{customerId}/orders/{orderId}` | Order with its lines |
+| `GET` | `/api/me` | My customer profile (created on the first call) |
+| `GET` `DELETE` | `/api/me/cart` | Get / empty my cart |
+| `POST` | `/api/me/cart/items` | Add a product |
+| `DELETE` | `/api/me/cart/items/{productId}` | Remove a product |
+| `POST` | `/api/me/orders` | Place an order from my cart |
+| `GET` | `/api/me/orders` | My order history (paginated, newest first) |
+| `GET` | `/api/me/orders/{orderId}` | One of my orders with its lines |
+| `GET` | `/api/admin/customers/{id}[/orders[/{orderId}]]` | Customer support: a customer, their orders |
+
+### Security
+
+The API is an OAuth2 **resource server**: every protected call carries a Keycloak access token
+(`Authorization: Bearer …`), checked for its signature (realm keys), issuer, audience `ecommerce-api` and expiry.
+
+| Routes | Access |
+|---|---|
+| `GET` on products and categories | Public |
+| Writes on products and categories, `/api/admin/**` | Realm role `ADMIN` |
+| `/api/me/**` | Realm role `CUSTOMER` (every user has it) |
+| Anything else | Refused (a new endpoint is closed until a rule opens it) |
+
+There is no sign-up endpoint and no customer id in the URLs: the customer is always the one of the token. Their
+record is created on their first call from the token claims (`sub`, `email`, `name`), and their e-mail and name follow
+Keycloak afterwards. A customer created before authentication is attached to the Keycloak user with the same e-mail,
+only if Keycloak verified that e-mail.
+
+A token of a demo user for curl or scripts (development only, password grant on a local client created on first use):
+
+```bash
+curl -H "Authorization: Bearer $(./scripts/dev-token.sh alice@example.com)" http://localhost:8080/api/me
+```
 
 The full contract, with request/response schemas and error codes, is in Swagger UI.
 
@@ -173,6 +199,8 @@ All errors share the RFC 9457 structure; validation errors add a field-by-field 
 | Status | When |
 |---|---|
 | `400` | Validation error, malformed body, unsupported sort property, page size above 100 |
+| `401` | Missing, invalid or expired token (`code`: `UNAUTHENTICATED`, `WWW-Authenticate: Bearer`) |
+| `403` | Valid token without the required role (`code`: `ACCESS_DENIED`) |
 | `404` | Unknown resource, or an order belonging to another customer |
 | `409` | Duplicate, resource in use, insufficient stock, empty cart, concurrent modification |
 
@@ -268,7 +296,7 @@ http://localhost:3000 (admin / admin):
 
 - **Dashboards → E-commerce → Vue d'ensemble**: orders per minute, revenue, average basket, cache hit ratio, p95
   latency per endpoint, confirmation duration (provisioned from `observability/grafana`, read-only)
-- **Explore → Tempo**, query `{ resource.service.name = "ecommerce" && span.http.route = "/api/customers/{customerId}/orders" }`:
+- **Explore → Tempo**, query `{ resource.service.name = "ecommerce" && span.http.route = "/api/me/orders" }`:
   the order trace, with its SQL queries and the `order confirmation` span; **Logs for this span** opens the matching
   lines in Loki
 - **Explore → Loki**: `{service_name="ecommerce"} | trace_id="<traceId>"` for the logs of one request
@@ -294,15 +322,16 @@ shared by all Spring contexts.
 | Repositories | `@DataJpaTest` on PostgreSQL | Migrations, queries, projections, constraints |
 | Controllers | `@WebMvcTest` | Validation, status codes, RFC 9457 payloads |
 | Observability | JUnit, OpenTelemetry SDK (in-memory) | Noise filter, logs exported with their trace id, `traceId` in errors |
+| Security | `@WebMvcTest` with `@WithMockUser`, JUnit | 401 / 403 per route, customer taken from the token, first-call provisioning |
 | Integration (`*IT`) | `@SpringBootTest` | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch |
 
-177 tests (158 unit/slice, 19 integration). Coverage report: `target/site/jacoco/index.html`.
+195 tests (176 unit/slice, 19 integration). Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 
 | Limitation | Next step |
 |---|---|
-| No authentication: any caller can act on any `customerId` | Spring Security with OAuth2/JWT, customer id taken from the token |
+| Browser clients must handle tokens themselves | Backend for frontend: browser login through the API, tokens kept server-side (next) |
 | Confirmation is lost if the app stops between commit and email (order stays `PENDING`) | Transactional outbox + retry, or a message broker |
 | Caffeine is local to one instance | Redis when running several instances |
 | `name LIKE '%x%'` cannot use a B-tree index | PostgreSQL `pg_trgm` GIN index or full-text search |

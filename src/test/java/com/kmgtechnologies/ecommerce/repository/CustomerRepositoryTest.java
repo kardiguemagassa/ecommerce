@@ -32,4 +32,32 @@ class CustomerRepositoryTest {
         assertThatThrownBy(() -> customerRepository.saveAndFlush(new Customer("alice@example.com", "Other")))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    void findByExternalId_findsTheCustomerOfAKeycloakUser() {
+        customerRepository.saveAndFlush(new Customer("sub-alice", "alice@example.com", "Alice"));
+
+        assertThat(customerRepository.findByExternalId("sub-alice"))
+                .get()
+                .extracting(Customer::getEmail)
+                .isEqualTo("alice@example.com");
+        assertThat(customerRepository.findByExternalId("sub-bob")).isEmpty();
+    }
+
+    @Test
+    void save_rejectsTwoCustomersForTheSameKeycloakUser() {
+        customerRepository.saveAndFlush(new Customer("sub-alice", "alice@example.com", "Alice"));
+
+        assertThatThrownBy(() -> customerRepository.saveAndFlush(new Customer("sub-alice", "other@example.com", "Other")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void findByEmailAndExternalIdIsNull_onlyFindsCustomersNotLinkedYet() {
+        customerRepository.saveAndFlush(new Customer("legacy@example.com", "Legacy"));
+        customerRepository.saveAndFlush(new Customer("sub-alice", "alice@example.com", "Alice"));
+
+        assertThat(customerRepository.findByEmailAndExternalIdIsNull("legacy@example.com")).isPresent();
+        assertThat(customerRepository.findByEmailAndExternalIdIsNull("alice@example.com")).isEmpty();
+    }
 }
