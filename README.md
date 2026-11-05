@@ -60,6 +60,7 @@ cp .env.example .env
 | `BFF_CLIENT_SECRET` | Secret of the confidential client `ecommerce-bff` | — |
 | `DEMO_USER_PASSWORD` | Password of the demo users (12 characters minimum) | — |
 | `SHOP_ADMIN_EMAIL` | E-mail (and username) of the shop administrator, kept out of Git | — |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional Google sign-in (`scripts/keycloak-google.sh`) | — |
 | `TRACING_SAMPLING_PROBABILITY` | Share of requests traced | `0.1` (`1.0` in `.env.example` and Compose) |
 | `API_DOCS_ENABLED` | Expose OpenAPI + Swagger UI | `true` (set `false` in production) |
 
@@ -114,6 +115,22 @@ volume to re-import it). Secrets and passwords are placeholders resolved from `.
 | Policies | French login pages, self-registration with the e-mail as username, passwords of 12 characters minimum, brute-force protection, access tokens valid 5 minutes |
 
 Access tokens carry the audience `ecommerce-api` and the realm roles in a `roles` claim.
+
+#### Sign in with Google (optional)
+
+Keycloak brokers the Google login: the application only ever sees Keycloak tokens and sessions, so nothing changes
+in the API. Not part of the versioned realm (no broken button without credentials, no secret in Git), it is added to
+a running Keycloak by a script:
+
+1. Google Cloud console, *Google Auth Platform*: consent screen (external, your account as test user), then an OAuth
+   client of type *Web application* with the authorized redirect URI
+   `http://localhost:8180/realms/ecommerce/broker/google/endpoint`.
+2. `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`.
+3. `./scripts/keycloak-google.sh` (idempotent: adds or updates the provider).
+
+The login page then shows a **Google** button. A first Google login creates the user with the `CUSTOMER` role and a
+verified e-mail; if an account with that e-mail already exists, Keycloak asks its owner to sign in to it once before
+linking the two, so the account keeps its roles.
 
 ### Database migrations
 
