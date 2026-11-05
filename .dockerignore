@@ -11,3 +11,5 @@ target/
 !.env.example
 http/
 observability/
+# React front-end: built by its own image (nginx), not part of the API image
+frontend/

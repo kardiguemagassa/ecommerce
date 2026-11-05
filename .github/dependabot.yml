@@ -21,6 +21,15 @@ updates:
     groups:
       maven-minor-and-patch:
         update-types: [minor, patch]
+  # React front-end (frontend/package.json): minor and patch updates grouped, majors one by one.
+  - package-ecosystem: npm
+    directory: /frontend
+    target-branch: dev
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
   - package-ecosystem: docker
     directory: /
     target-branch: dev

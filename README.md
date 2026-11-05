@@ -36,6 +36,7 @@ consistency, caching, observability and an automated test suite.
 | Tests | JUnit 5, Mockito, AssertJ, Awaitility, Testcontainers (PostgreSQL, SeaweedFS), JaCoCo |
 | Build | Maven (Surefire for unit tests, Failsafe for integration tests) |
 | Packaging | Docker multi-stage image (layered, non-root), Docker Compose |
+| Front-end | React 19, TypeScript, Vite, MUI, React Router, TanStack Query; API client generated from OpenAPI (openapi-typescript, openapi-fetch); Vitest, Testing Library, MSW |
 
 ## Getting started
 
@@ -43,6 +44,7 @@ consistency, caching, observability and an automated test suite.
 
 - Docker: database, Keycloak, media storage, observability backend, tests (Testcontainers), and optionally the API itself
 - Java 21, to build and run the application outside a container
+- Node.js 24 (version in [`frontend/.nvmrc`](frontend/.nvmrc): `nvm use`), for the React front-end
 
 ### Configuration
 
@@ -106,6 +108,36 @@ Ready-to-run requests for the IntelliJ HTTP client are in [`http/`](http/) (envi
 signing in; put the demo password (and your `SHOP_ADMIN_EMAIL` as `adminEmail`) in
 `http/http-client.private.env.json`, git-ignored, and run `./scripts/dev-token.sh alice@example.com` once to create the
 development client.
+
+### Front-end (React)
+
+The shop's web interface lives in [`frontend/`](frontend/). In development, Vite serves it on
+http://localhost:5173 and forwards `/api`, `/oauth2`, `/login/oauth2` and `/logout` to the API: one origin for the
+browser, so the session cookie and the CSRF token work without CORS.
+
+```bash
+# API and its services running (see above); in .env: BFF_FRONT_URL=http://localhost:5173/
+cd frontend
+nvm use            # Node.js version of .nvmrc
+npm ci
+npm run dev        # http://localhost:5173
+```
+
+- **Sign-in through the API** (Backend for Frontend): the browser holds an HttpOnly session cookie, never a token.
+  The front-end reads who is signed in from `GET /api/me/session` and sends the `XSRF-TOKEN` cookie back as
+  `X-XSRF-TOKEN` with every write.
+- **Typed client**: [`frontend/openapi.json`](frontend/openapi.json) is the API contract, from which
+  `src/api/schema.d.ts` is generated (`npm run api:types`, run before `dev`, `build`, `lint`, `typecheck` and `test`).
+  `./mvnw verify` exports the live contract to `target/openapi.json`; CI fails when the copy in `frontend/` differs.
+  After an API change: `./mvnw verify`, then `npm run api:sync` in `frontend/`, and commit `openapi.json`.
+- **Errors**: every failed call is shown in French, with the `traceId` of the request to quote to the support.
+
+| Command (in `frontend/`) | Purpose |
+|---|---|
+| `npm run dev` | Development server with hot reload |
+| `npm run lint` / `npm run typecheck` | ESLint / TypeScript (strict) |
+| `npm test` | Unit and component tests (Vitest, Testing Library, API mocked with MSW) |
+| `npm run build` | Production build in `frontend/dist` |
 
 ### Identity provider (Keycloak)
 
@@ -398,8 +430,9 @@ shared by all Spring contexts.
 | Security | `@WebMvcTest` with `@WithMockUser` / `oidcLogin()`, JUnit | 401 / 403 per route, CSRF on session writes, session endpoint, logout URL, roles of the ID token, first-call provisioning |
 | Images | JUnit, Mockito | Format detection, decompression bombs, EXIF orientation and removal, crop and size, storage kept in step with commits and rollbacks |
 | Integration (`*IT`) | `@SpringBootTest`, Testcontainers SeaweedFS | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch, images served publicly and deleted |
+| Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors, header signed in or not (photo or initials, cart badge, admin link), protected pages, session expiry |
 
-270 tests (243 unit/slice, 27 integration). Coverage report: `target/site/jacoco/index.html`.
+272 tests (243 unit/slice, 29 integration), plus 23 front-end tests. Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 
@@ -415,7 +448,7 @@ shared by all Spring contexts.
 
 | Workflow | When | What |
 |---|---|---|
-| [CI](.github/workflows/ci.yml) | Every pull request to `dev`/`main`, every push to `dev` | `build`: `./mvnw verify` (tests on PostgreSQL 18, coverage summary). `smoke`: the Compose stack built and started, then `scripts/smoke.sh` |
+| [CI](.github/workflows/ci.yml) | Every pull request to `dev`/`main`, every push to `dev` | `build`: `./mvnw verify` (tests on PostgreSQL 18, coverage summary), OpenAPI contract of the front-end up to date. `frontend`: lint, types, tests, build. `smoke`: the Compose stack built and started, then `scripts/smoke.sh` |
 | [Release](.github/workflows/release.yml) | Push to `main`, tag `vX.Y.Z` | Tests again, image scanned by Trivy (no fixable CRITICAL vulnerability), then pushed to Docker Hub for amd64 and arm64 with SBOM and provenance |
 | [Dependabot](.github/dependabot.yml) | Weekly | Update pull requests to `dev`: GitHub Actions, Maven, Dockerfile and Compose images |
 
@@ -430,5 +463,5 @@ IMAGE_NAMESPACE=kardigue IMAGE_TAG=1.1.0 docker compose --profile app up -d --no
 
 ## Workflow
 
-- Feature branches merged into `dev` through pull requests; `main` and `dev` are protected, CI `build` and `smoke` required
+- Feature branches merged into `dev` through pull requests; `main` and `dev` are protected, CI `build`, `frontend` and `smoke` required
 - [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `test`, `build`, `docs`, `chore`)

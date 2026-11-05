@@ -42,6 +42,8 @@ services:
       # Browser login through the API (BFF): token endpoint on the compose network, secret of ecommerce-bff from .env.
       KEYCLOAK_REALM_URI: http://keycloak:8080/realms/ecommerce
       BFF_CLIENT_SECRET: ${BFF_CLIENT_SECRET:?BFF_CLIENT_SECRET is required}
+      # Where the browser lands after login and logout: the session endpoint, or the React dev server (.env).
+      BFF_FRONT_URL: ${BFF_FRONT_URL:-http://localhost:8080/api/me/session}
       # Every request traced in development; traces, metrics and logs sent to the collector on the compose network.
       TRACING_SAMPLING_PROBABILITY: "1.0"
       OTEL_TRACES_ENDPOINT: http://otel-lgtm:4318/v1/traces

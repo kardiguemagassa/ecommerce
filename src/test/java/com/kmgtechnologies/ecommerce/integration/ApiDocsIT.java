@@ -9,6 +9,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -24,15 +27,34 @@ class ApiDocsIT {
     @Value("${local.server.port}")
     private int port;
 
+    /** Read by the front-end check (frontend/scripts/openapi.mjs) and by `npm run api:sync`. */
+    static final Path EXPORTED_CONTRACT = Path.of("target", "openapi.json");
+
+    private String json;
     private DocumentContext apiDocs;
 
     @BeforeEach
     void loadApiDocs() {
-        String json = RestClient.create().get()
+        json = RestClient.create().get()
                 .uri("http://localhost:{port}/v3/api-docs", port)
                 .retrieve()
                 .body(String.class);
         apiDocs = JsonPath.parse(json);
+    }
+
+    /** The contract the React client is generated from: CI fails when frontend/openapi.json no longer matches it. */
+    @Test
+    void exportsTheContractForTheFrontEnd() throws IOException {
+        Files.createDirectories(EXPORTED_CONTRACT.getParent());
+        Files.writeString(EXPORTED_CONTRACT, json);
+
+        assertThat(EXPORTED_CONTRACT).isNotEmptyFile();
+    }
+
+    @Test
+    void sessionEndpointTakesNoParameter() {
+        Map<String, Object> session = apiDocs.read("$.paths['/api/me/session'].get");
+        assertThat(session).doesNotContainKey("parameters");
     }
 
     @Test
