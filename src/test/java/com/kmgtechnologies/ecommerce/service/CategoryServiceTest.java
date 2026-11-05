@@ -14,12 +14,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,12 +41,12 @@ class CategoryServiceTest {
     @Test
     void create_savesTrimmedName() {
         when(categoryRepository.existsByNameIgnoreCase("Books")).thenReturn(false);
-        when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(categoryRepository.saveAndFlush(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CategoryResponse response = categoryService.create(new CategoryRequest("  Books  "));
 
         ArgumentCaptor<Category> captor = ArgumentCaptor.forClass(Category.class);
-        verify(categoryRepository).save(captor.capture());
+        verify(categoryRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getName()).isEqualTo("Books");
         assertThat(response.name()).isEqualTo("Books");
     }
@@ -55,7 +57,18 @@ class CategoryServiceTest {
 
         assertThatThrownBy(() -> categoryService.create(new CategoryRequest("Books")))
                 .isInstanceOf(DuplicateResourceException.class);
-        verify(categoryRepository, never()).save(any());
+        verify(categoryRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void create_reportsConcurrentDuplicateCaughtByTheDatabase() {
+        when(categoryRepository.existsByNameIgnoreCase("Books")).thenReturn(false);
+        when(categoryRepository.saveAndFlush(any(Category.class)))
+                .thenThrow(new DataIntegrityViolationException("uk_categories_name_lower"));
+
+        assertThatThrownBy(() -> categoryService.create(new CategoryRequest("Books")))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("Category 'Books' already exists");
     }
 
     @Test
@@ -77,6 +90,18 @@ class CategoryServiceTest {
 
         assertThat(category.getName()).isEqualTo("Novels");
         assertThat(response.name()).isEqualTo("Novels");
+        verify(categoryRepository).flush();
+    }
+
+    @Test
+    void update_reportsConcurrentDuplicateCaughtByTheDatabase() {
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(new Category("Books")));
+        when(categoryRepository.existsByNameIgnoreCaseAndIdNot("Novels", 1L)).thenReturn(false);
+        doThrow(new DataIntegrityViolationException("uk_categories_name_lower")).when(categoryRepository).flush();
+
+        assertThatThrownBy(() -> categoryService.update(1L, new CategoryRequest("Novels")))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessage("Category 'Novels' already exists");
     }
 
     @Test

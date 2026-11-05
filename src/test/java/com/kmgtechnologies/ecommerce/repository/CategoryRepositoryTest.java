@@ -42,6 +42,15 @@ class CategoryRepositoryTest {
     }
 
     @Test
+    void save_rejectsNameDifferingOnlyByCase() {
+        categoryRepository.saveAndFlush(new Category("Electronics"));
+
+        // Bypasses the service check: the unique index on lower(name) is the last line of defence
+        assertThatThrownBy(() -> categoryRepository.saveAndFlush(new Category("ELECTRONICS")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void save_rejectsNullName() {
         assertThatThrownBy(() -> categoryRepository.saveAndFlush(new Category(null)))
                 .isInstanceOf(DataIntegrityViolationException.class);
