@@ -3,9 +3,10 @@
 # real Keycloak tokens against the API, then the observability pipeline end to end.
 #   1. Keycloak serves the "ecommerce" realm; the API refuses anonymous (401) and under-privileged (403) calls
 #   2. the shop administrator creates a product, the customer alice@example.com orders it through /api/me
-#   3. an error response carries the id of its trace
-#   4. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
-#   5. the confirmation log lines of that trace reach Loki
+#   3. the browser login of the BFF: Keycloak login form, session cookie, CSRF on writes, logout at Keycloak
+#   4. an error response carries the id of its trace
+#   5. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
+#   6. the confirmation log lines of that trace reach Loki
 # Tokens of the demo users come from scripts/dev-token.sh (password grant on a development-only client).
 # Grafana's data source proxy is used for Tempo and Loki (admin/admin, development backend only).
 set -euo pipefail
@@ -76,6 +77,39 @@ response=$(call POST /me/orders "$ALICE")
 expect "$response" 201 "order placed"
 order=$(body "$response" | json "['id']")
 echo "OK  customer profile from the token, order $order placed through /api/me"
+
+# --- Browser login through the API (BFF), as a browser would do it ----------------------------------------------
+BASE=${API%/api}
+jar=$(mktemp)
+trap 'rm -f "$jar"' EXIT
+browser() { curl -sS -c "$jar" -b "$jar" "$@"; }
+form_action() { python3 -c "import html, re, sys; m = re.search(r'action=\"([^\"]+)\"', sys.stdin.read()); print(html.unescape(m.group(1)) if m else '')"; }
+
+action=$(browser -L "$BASE/oauth2/authorization/keycloak" | form_action)
+[ -n "$action" ] || fail "BFF login: no Keycloak login form"
+session=$(browser -L --data-urlencode "username=$CUSTOMER" --data-urlencode "password=$(setting DEMO_USER_PASSWORD)" "$action")
+[ "$(json "['authenticated']" <<< "$session")" = True ] || fail "BFF login: not signed in after the login form: $session"
+[ "$(json "['email']" <<< "$session")" = "$CUSTOMER" ] || fail "BFF login: session of another user: $session"
+grep -q 'JSESSIONID' "$jar" || fail "BFF login: no session cookie"
+xsrf=$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$jar" | tail -1)
+[ -n "$xsrf" ] || fail "BFF login: no XSRF-TOKEN cookie"
+echo "OK  BFF login of $CUSTOMER: Keycloak form, session cookie, no token in the browser"
+
+item="{\"productId\":$product,\"quantity\":1}"
+code=$(browser -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$item" "$API/me/cart/items")
+[ "$code" = 403 ] || fail "BFF session write without CSRF token: HTTP $code instead of 403"
+code=$(browser -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $xsrf" \
+  -d "$item" "$API/me/cart/items")
+[ "$code" = 200 ] || fail "BFF session write with CSRF token: HTTP $code instead of 200"
+echo "OK  session writes need the CSRF token (403 without, 200 with)"
+
+logout=$(browser -X POST -H "X-XSRF-TOKEN: $xsrf" "$BASE/logout")
+case "$(json "['logoutUrl']" <<< "$logout")" in
+  "$KEYCLOAK"/realms/ecommerce/protocol/openid-connect/logout\?*id_token_hint=*) ;;
+  *) fail "BFF logout: unexpected answer $logout" ;;
+esac
+[ "$(browser "$API/me/session" | json "['authenticated']")" = False ] || fail "BFF logout: session still open"
+echo "OK  logout closes the session and points to the Keycloak end-session endpoint"
 
 # --- Observability -------------------------------------------------------------------------------------------------
 error_trace=$(body "$(call GET /categories/999999999 none)" | json ".get('traceId', '')")

@@ -8,12 +8,14 @@ import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.service.CartService;
 import com.kmgtechnologies.ecommerce.security.CurrentCustomer;
+import com.kmgtechnologies.ecommerce.security.BffTestConfiguration;
 import com.kmgtechnologies.ecommerce.security.SecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -25,6 +27,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -36,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(CartController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, BffTestConfiguration.class})
 @WithMockUser(roles = "CUSTOMER")
 @ActiveProfiles("test")
 class CartControllerTest {
@@ -166,5 +169,33 @@ class CartControllerTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         verifyNoInteractions(cartService, currentCustomer);
+    }
+
+    @Test
+    void browserSessionWriteWithoutCsrfToken_isRefused() throws Exception {
+        mockMvc.perform(post("/api/me/cart/items")
+                        .cookie(new Cookie("JSESSIONID", "session-id"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productId": 10, "quantity": 2}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        verifyNoInteractions(cartService);
+    }
+
+    @Test
+    void browserSessionWriteWithCsrfToken_isAccepted() throws Exception {
+        when(cartService.addItem(eq(1L), any(AddCartItemRequest.class))).thenReturn(CART_WITH_LAPTOP);
+
+        mockMvc.perform(post("/api/me/cart/items")
+                        .cookie(new Cookie("JSESSIONID", "session-id"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productId": 10, "quantity": 2}
+                                """))
+                .andExpect(status().isOk());
     }
 }
