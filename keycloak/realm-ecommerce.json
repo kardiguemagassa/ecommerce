@@ -169,8 +169,8 @@
       ]
     },
     {
-      "username": "admin@example.com",
-      "email": "admin@example.com",
+      "username": "${SHOP_ADMIN_EMAIL}",
+      "email": "${SHOP_ADMIN_EMAIL}",
       "emailVerified": true,
       "enabled": true,
       "firstName": "Admin",

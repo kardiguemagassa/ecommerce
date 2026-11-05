@@ -99,6 +99,7 @@ services:
       # Placeholders resolved in the realm file at import: no secret in Git.
       BFF_CLIENT_SECRET: ${BFF_CLIENT_SECRET:?BFF_CLIENT_SECRET is required}
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:?DEMO_USER_PASSWORD is required}
+      SHOP_ADMIN_EMAIL: ${SHOP_ADMIN_EMAIL:?SHOP_ADMIN_EMAIL is required}
     ports:
       - "127.0.0.1:${KEYCLOAK_PORT:-8180}:8080"
     volumes:

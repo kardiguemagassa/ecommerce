@@ -59,6 +59,7 @@ cp .env.example .env
 | `KEYCLOAK_PORT`, `KEYCLOAK_ADMIN_USERNAME`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Keycloak and its admin console | `8180` |
 | `BFF_CLIENT_SECRET` | Secret of the confidential client `ecommerce-bff` | — |
 | `DEMO_USER_PASSWORD` | Password of the demo users (12 characters minimum) | — |
+| `SHOP_ADMIN_EMAIL` | E-mail (and username) of the shop administrator, kept out of Git | — |
 | `TRACING_SAMPLING_PROBABILITY` | Share of requests traced | `0.1` (`1.0` in `.env.example` and Compose) |
 | `API_DOCS_ENABLED` | Expose OpenAPI + Swagger UI | `true` (set `false` in production) |
 
@@ -106,7 +107,7 @@ volume to re-import it). Secrets and passwords are placeholders resolved from `.
 | Realm roles | `CUSTOMER` (given to every new user: own cart and orders), `ADMIN` (catalog, customer support) |
 | `ecommerce-bff` | Confidential client of the API: browser login (authorization code + PKCE), tokens kept server-side |
 | `ecommerce-swagger` | Public client of Swagger UI (authorization code + PKCE) |
-| Demo users | `alice@example.com` (`CUSTOMER`), `admin@example.com` (`CUSTOMER`, `ADMIN`), password `DEMO_USER_PASSWORD` |
+| Demo users | `alice@example.com` (`CUSTOMER`) and the shop administrator `SHOP_ADMIN_EMAIL` (`CUSTOMER`, `ADMIN`; `admin@example.com` in `.env.example`), password `DEMO_USER_PASSWORD` |
 | Policies | French login pages, self-registration with the e-mail as username, passwords of 12 characters minimum, brute-force protection, access tokens valid 5 minutes |
 
 Access tokens carry the audience `ecommerce-api` and the realm roles in a `roles` claim.
