@@ -8,6 +8,7 @@ import com.kmgtechnologies.ecommerce.entity.Customer;
 import com.kmgtechnologies.ecommerce.entity.Product;
 import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
+import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CartRepository;
 import com.kmgtechnologies.ecommerce.repository.CustomerRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
@@ -21,19 +22,22 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
+    private final MediaUrls mediaUrls;
 
     public CartService(CartRepository cartRepository,
                        CustomerRepository customerRepository,
-                       ProductRepository productRepository) {
+                       ProductRepository productRepository,
+                       MediaUrls mediaUrls) {
         this.cartRepository = cartRepository;
         this.customerRepository = customerRepository;
         this.productRepository = productRepository;
+        this.mediaUrls = mediaUrls;
     }
 
     public CartResponse getCart(Long customerId) {
         ensureCustomerExists(customerId);
         return cartRepository.findWithItemsByCustomerId(customerId)
-                .map(cart -> CartResponse.from(customerId, cart))
+                .map(cart -> CartResponse.from(customerId, cart, mediaUrls))
                 .orElseGet(() -> CartResponse.empty(customerId));
     }
 
@@ -51,7 +55,7 @@ public class CartService {
         }
 
         cart.addItem(product, request.quantity());
-        return CartResponse.from(customerId, cart);
+        return CartResponse.from(customerId, cart, mediaUrls);
     }
 
     @Transactional
@@ -64,7 +68,7 @@ public class CartService {
         if (!cart.removeItem(productId)) {
             throw notInCart(productId);
         }
-        return CartResponse.from(customerId, cart);
+        return CartResponse.from(customerId, cart, mediaUrls);
     }
 
     @Transactional

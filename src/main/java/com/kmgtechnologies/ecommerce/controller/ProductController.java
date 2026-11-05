@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,7 +28,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
@@ -36,9 +39,11 @@ import java.util.Set;
 
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.BAD_REQUEST;
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.CONFLICT;
+import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.IMAGE_REJECTED;
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.NOT_FOUND;
+import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.STORAGE_UNAVAILABLE;
 
-@Tag(name = "Products", description = "Product catalog: search, details (cached), management and best sellers")
+@Tag(name = "Products", description = "Product catalog: search, details (cached), management, images and best sellers")
 @RestController
 @RequestMapping("/api/products")
 public class ProductController {
@@ -113,7 +118,7 @@ public class ProductController {
         return productService.update(id, request);
     }
 
-    @Operation(summary = "Delete a product", description = "Evicts the cached product.")
+    @Operation(summary = "Delete a product", description = "Evicts the cached product and deletes its image.")
     @ApiResponse(responseCode = "204", description = "Product deleted")
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @ApiResponse(responseCode = "409", ref = CONFLICT)
@@ -121,5 +126,31 @@ public class ProductController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         productService.delete(id);
+    }
+
+    @Operation(summary = "Replace the image of a product",
+            description = """
+                    Multipart field `file`: JPEG, PNG or WebP, 2 MB at most (format read from the content). Stored as \
+                    a JPEG of 1200 x 900 at most (4:3, centred crop, never enlarged), without the metadata of the \
+                    upload (EXIF, GPS). The previous image is deleted. Returns the product with its new `imageUrl`.""")
+    @ApiResponse(responseCode = "200", description = "Image stored")
+    @ApiResponse(responseCode = "404", ref = NOT_FOUND)
+    @ApiResponse(responseCode = "409", ref = CONFLICT)
+    @ApiResponse(responseCode = "413", ref = IMAGE_REJECTED)
+    @ApiResponse(responseCode = "415", ref = IMAGE_REJECTED)
+    @ApiResponse(responseCode = "422", ref = IMAGE_REJECTED)
+    @ApiResponse(responseCode = "503", ref = STORAGE_UNAVAILABLE)
+    @PutMapping(path = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ProductResponse replaceImage(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+        return productService.replaceImage(id, file);
+    }
+
+    @Operation(summary = "Remove the image of a product")
+    @ApiResponse(responseCode = "204", description = "Image removed (or there was none)")
+    @ApiResponse(responseCode = "404", ref = NOT_FOUND)
+    @DeleteMapping("/{id}/image")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteImage(@PathVariable Long id) {
+        productService.deleteImage(id);
     }
 }

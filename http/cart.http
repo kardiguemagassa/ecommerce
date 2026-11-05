@@ -81,3 +81,19 @@ Authorization: Bearer {{customerToken}}
 
 ### Without token → 401 (code UNAUTHENTICATED)
 GET {{baseUrl}}/api/me/cart
+
+### Upload my profile photo (JPEG, PNG or WebP, 1 MB at most; stored as JPEG 256 x 256) → 200, with avatarUrl
+PUT {{baseUrl}}/api/me/avatar
+Authorization: Bearer {{customerToken}}
+Content-Type: multipart/form-data; boundary=upload
+
+--upload
+Content-Disposition: form-data; name="file"; filename="sample.png"
+Content-Type: image/png
+
+< ./images/sample.png
+--upload--
+
+### Delete my profile photo → 204
+DELETE {{baseUrl}}/api/me/avatar
+Authorization: Bearer {{customerToken}}

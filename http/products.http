@@ -56,6 +56,39 @@ Content-Type: application/json
 
 {"name": "Laptop Pro", "description": "16 inch", "price": 1499.00, "stock": 5, "categoryId": {{categoryId}}}
 
+### Upload the product image (JPEG, PNG or WebP, 2 MB at most; stored as JPEG 4:3) → 200, with imageUrl
+PUT {{baseUrl}}/api/products/{{productId}}/image
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=upload
+
+--upload
+Content-Disposition: form-data; name="file"; filename="sample.png"
+Content-Type: image/png
+
+< ./images/sample.png
+--upload--
+
+> {% client.global.set("imageUrl", response.body.imageUrl); %}
+
+### Read the image from the media storage, anonymously (as a browser) → 200 image/jpeg
+GET {{imageUrl}}
+
+### A file that is not an image, whatever its name → 415 UNSUPPORTED_IMAGE
+PUT {{baseUrl}}/api/products/{{productId}}/image
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=upload
+
+--upload
+Content-Disposition: form-data; name="file"; filename="fake.png"
+Content-Type: image/png
+
+<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>
+--upload--
+
+### Remove the product image → 204
+DELETE {{baseUrl}}/api/products/{{productId}}/image
+Authorization: Bearer {{adminToken}}
+
 ### Delete the category while it has products → 409
 DELETE {{baseUrl}}/api/categories/{{categoryId}}
 Authorization: Bearer {{adminToken}}

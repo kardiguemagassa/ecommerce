@@ -39,6 +39,10 @@ public class Product {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    /** Object key of the image in the media storage; null without image. */
+    @Column(length = 200)
+    private String imageKey;
+
     @Version
     private Long version;
 
@@ -95,6 +99,14 @@ public class Product {
 
     public void setCategory(Category category) {
         this.category = category;
+    }
+
+    public String getImageKey() {
+        return imageKey;
+    }
+
+    public void setImageKey(String imageKey) {
+        this.imageKey = imageKey;
     }
 
     public Long getVersion() {

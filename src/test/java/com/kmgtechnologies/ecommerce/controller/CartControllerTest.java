@@ -46,7 +46,8 @@ class CartControllerTest {
 
     private static final CartResponse CART_WITH_LAPTOP = new CartResponse(
             1L,
-            List.of(new CartItemResponse(10L, "Laptop", new BigDecimal("999.99"), 2, new BigDecimal("1999.98"))),
+            List.of(new CartItemResponse(10L, "Laptop", new BigDecimal("999.99"), 2, new BigDecimal("1999.98"),
+                    "http://media.test/products/laptop.jpg")),
             2,
             new BigDecimal("1999.98"));
 

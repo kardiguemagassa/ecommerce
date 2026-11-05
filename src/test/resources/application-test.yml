@@ -14,6 +14,13 @@ spring:
 app:
   notification:
     simulated-delay: PT0S
+  # No storage by default: the S3 client connects lazily, nothing is provisioned. MediaStorageIT starts SeaweedFS.
+  media:
+    endpoint: http://localhost:1
+    access-key: test
+    secret-key: test-secret
+    public-url: http://media.test/ecommerce-media
+    provision: false
 
 management:
   server:

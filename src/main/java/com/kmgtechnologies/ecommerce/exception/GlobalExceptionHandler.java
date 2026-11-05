@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.util.LinkedHashMap;
@@ -68,6 +69,36 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "The resource was modified by another request, please retry");
     }
 
+    @ExceptionHandler(ImageTooLargeException.class)
+    public ProblemDetail handleImageTooLarge(ImageTooLargeException ex) {
+        return imageProblem(HttpStatus.CONTENT_TOO_LARGE, "Image too large", ex.getMessage(), "IMAGE_TOO_LARGE");
+    }
+
+    @ExceptionHandler(UnsupportedImageException.class)
+    public ProblemDetail handleUnsupportedImage(UnsupportedImageException ex) {
+        return imageProblem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported image", ex.getMessage(), "UNSUPPORTED_IMAGE");
+    }
+
+    @ExceptionHandler(InvalidImageException.class)
+    public ProblemDetail handleInvalidImage(InvalidImageException ex) {
+        return imageProblem(HttpStatus.UNPROCESSABLE_CONTENT, "Invalid image", ex.getMessage(), "INVALID_IMAGE");
+    }
+
+    @ExceptionHandler(StorageUnavailableException.class)
+    public ProblemDetail handleStorageUnavailable(StorageUnavailableException ex) {
+        log.warn("Media storage unavailable: {}", ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());
+        return imageProblem(HttpStatus.SERVICE_UNAVAILABLE, "Storage unavailable", ex.getMessage(), "STORAGE_UNAVAILABLE");
+    }
+
+    /** Upload above the multipart limit (the largest image kind): refused before the file is read. */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex,
+            @NonNull HttpHeaders headers, @NonNull HttpStatusCode status, @NonNull WebRequest request) {
+        ProblemDetail problem = imageProblem(HttpStatus.CONTENT_TOO_LARGE, "Image too large",
+                "The file exceeds the upload limit", "IMAGE_TOO_LARGE");
+        return handleExceptionInternal(ex, problem, headers, HttpStatus.CONTENT_TOO_LARGE, request);
+    }
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, @NonNull HttpHeaders headers, @NonNull HttpStatusCode status, @NonNull WebRequest request) {
         Map<String, String> errors = new LinkedHashMap<>();
@@ -79,6 +110,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setProperty("errors", errors);
 
         return handleExceptionInternal(ex, problem, headers, status, request);
+    }
+
+    /** Image errors carry a stable {@code code}: the front-end shows its own message for each. */
+    private static ProblemDetail imageProblem(HttpStatus status, String title, String detail, String code) {
+        ProblemDetail problem = problem(status, title, detail);
+        problem.setProperty("code", code);
+        return problem;
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {

@@ -1,6 +1,5 @@
 package com.kmgtechnologies.ecommerce.repository;
 
-import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.entity.Category;
 import com.kmgtechnologies.ecommerce.entity.Product;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,36 +50,36 @@ class ProductRepositoryTest {
 
     @Test
     void search_withoutFilters_returnsAllProducts() {
-        Page<ProductResponse> page = productRepository.search(null, "", FIRST_PAGE_BY_NAME);
+        Page<ProductRow> page = productRepository.search(null, "", FIRST_PAGE_BY_NAME);
 
         assertThat(page.getTotalElements()).isEqualTo(3);
-        assertThat(page.getContent()).extracting(ProductResponse::name).containsExactly("Clean Code", "Laptop", "Phone");
+        assertThat(page.getContent()).extracting(ProductRow::name).containsExactly("Clean Code", "Laptop", "Phone");
     }
 
     @Test
     void search_byCategory_returnsOnlyProductsOfThatCategory() {
-        Page<ProductResponse> page = productRepository.search(electronics.getId(), "", FIRST_PAGE_BY_NAME);
+        Page<ProductRow> page = productRepository.search(electronics.getId(), "", FIRST_PAGE_BY_NAME);
 
-        assertThat(page.getContent()).extracting(ProductResponse::name).containsExactly("Laptop", "Phone");
+        assertThat(page.getContent()).extracting(ProductRow::name).containsExactly("Laptop", "Phone");
     }
 
     @Test
     void search_byName_isCaseInsensitive() {
-        Page<ProductResponse> page = productRepository.search(null, "LAP", FIRST_PAGE_BY_NAME);
+        Page<ProductRow> page = productRepository.search(null, "LAP", FIRST_PAGE_BY_NAME);
 
-        assertThat(page.getContent()).extracting(ProductResponse::name).containsExactly("Laptop");
+        assertThat(page.getContent()).extracting(ProductRow::name).containsExactly("Laptop");
     }
 
     @Test
     void search_byCategoryAndName_combinesFilters() {
-        Page<ProductResponse> page = productRepository.search(books.getId(), "lap", FIRST_PAGE_BY_NAME);
+        Page<ProductRow> page = productRepository.search(books.getId(), "lap", FIRST_PAGE_BY_NAME);
 
         assertThat(page.getContent()).isEmpty();
     }
 
     @Test
     void search_returnsCategoryInProjection() {
-        Page<ProductResponse> page = productRepository.search(books.getId(), "", FIRST_PAGE_BY_NAME);
+        Page<ProductRow> page = productRepository.search(books.getId(), "", FIRST_PAGE_BY_NAME);
 
         assertThat(page.getContent()).singleElement()
                 .satisfies(product -> {
@@ -92,7 +91,7 @@ class ProductRepositoryTest {
 
     @Test
     void search_paginatesResults() {
-        Page<ProductResponse> page = productRepository.search(null, "", PageRequest.of(0, 2, Sort.by("name")));
+        Page<ProductRow> page = productRepository.search(null, "", PageRequest.of(0, 2, Sort.by("name")));
 
         assertThat(page.getContent()).hasSize(2);
         assertThat(page.getTotalElements()).isEqualTo(3);
@@ -115,11 +114,11 @@ class ProductRepositoryTest {
     }
 
     @Test
-    void findResponseById_returnsProjectionWithCategory() {
+    void findRowById_returnsProjectionWithCategory() {
         Long laptopId = productRepository.search(null, "Laptop", FIRST_PAGE_BY_NAME)
                 .getContent().getFirst().id();
 
-        Optional<ProductResponse> result = productRepository.findResponseById(laptopId);
+        Optional<ProductRow> result = productRepository.findRowById(laptopId);
 
         assertThat(result).get().satisfies(product -> {
             assertThat(product.name()).isEqualTo("Laptop");
@@ -128,7 +127,18 @@ class ProductRepositoryTest {
     }
 
     @Test
-    void findResponseById_returnsEmptyForUnknownProduct() {
-        assertThat(productRepository.findResponseById(999_999L)).isEmpty();
+    void findRowById_returnsTheImageKey() {
+        Product laptop = productRepository.findById(productRepository.search(null, "Laptop", FIRST_PAGE_BY_NAME)
+                .getContent().getFirst().id()).orElseThrow();
+        laptop.setImageKey("products/laptop.jpg");
+        entityManager.flush();
+
+        assertThat(productRepository.findRowById(laptop.getId()))
+                .get().extracting(ProductRow::imageKey).isEqualTo("products/laptop.jpg");
+    }
+
+    @Test
+    void findRowById_returnsEmptyForUnknownProduct() {
+        assertThat(productRepository.findRowById(999_999L)).isEmpty();
     }
 }

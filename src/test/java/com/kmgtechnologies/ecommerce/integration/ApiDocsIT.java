@@ -74,5 +74,17 @@ class ApiDocsIT {
 
         String productNotFoundRef = apiDocs.read("$.paths['/api/products/{id}'].get.responses['404']['$ref']");
         assertThat(productNotFoundRef).isEqualTo("#/components/responses/NotFound");
+
+        String imageRejectedRef = apiDocs.read("$.paths['/api/products/{id}/image'].put.responses['415']['$ref']");
+        assertThat(imageRejectedRef).isEqualTo("#/components/responses/ImageRejected");
+        assertThat(problemProperties).containsKeys("code", "traceId");
+    }
+
+    @Test
+    void imageUploadsAreMultipart() {
+        Map<String, Object> productImage = apiDocs.read("$.paths['/api/products/{id}/image'].put.requestBody.content");
+        Map<String, Object> avatar = apiDocs.read("$.paths['/api/me/avatar'].put.requestBody.content");
+        assertThat(productImage).containsOnlyKeys("multipart/form-data");
+        assertThat(avatar).containsOnlyKeys("multipart/form-data");
     }
 }

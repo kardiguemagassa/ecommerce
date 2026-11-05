@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 class CurrentCustomerTest {
 
     private static final String SUBJECT = "6f1c2a3b-0000-4000-8000-000000000001";
-    private static final CustomerResponse ALICE = new CustomerResponse(1L, "alice@example.com", "Alice Martin");
+    private static final CustomerResponse ALICE = new CustomerResponse(1L, "alice@example.com", "Alice Martin", null);
 
     private final CustomerService customerService = mock(CustomerService.class);
     private final CurrentCustomer currentCustomer = new CurrentCustomer(customerService);

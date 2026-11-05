@@ -67,14 +67,15 @@ jobs:
       - name: Create .env
         run: |
           cp .env.example .env
-          for key in POSTGRES_USERNAME POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD KEYCLOAK_DB_PASSWORD BFF_CLIENT_SECRET DEMO_USER_PASSWORD; do
+          for key in POSTGRES_USERNAME POSTGRES_PASSWORD KEYCLOAK_ADMIN_PASSWORD KEYCLOAK_DB_PASSWORD BFF_CLIENT_SECRET DEMO_USER_PASSWORD \
+                     MEDIA_ACCESS_KEY MEDIA_SECRET_KEY; do
             value="u$(openssl rand -hex 12)"
             echo "::add-mask::$value"
             sed -i "s|^${key}=.*|${key}=${value}|" .env
           done
       - name: Start the stack
         run: docker compose --profile app up -d --build --wait --wait-timeout 300
-      # An order placed through the API, its trace read back from Tempo and its logs from Loki.
+      # An order placed through the API, images uploaded, the order trace read back from Tempo and its logs from Loki.
       - name: Smoke test
         run: ./scripts/smoke.sh
       - name: Container logs

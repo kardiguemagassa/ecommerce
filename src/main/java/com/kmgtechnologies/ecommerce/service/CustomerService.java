@@ -3,9 +3,13 @@ package com.kmgtechnologies.ecommerce.service;
 import com.kmgtechnologies.ecommerce.dto.CustomerResponse;
 import com.kmgtechnologies.ecommerce.entity.Customer;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
+import com.kmgtechnologies.ecommerce.media.ImageKind;
+import com.kmgtechnologies.ecommerce.media.MediaFiles;
+import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CustomerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -17,21 +21,47 @@ public class CustomerService {
     static final int MAX_NAME_LENGTH = 100;
 
     private final CustomerRepository customerRepository;
+    private final MediaFiles mediaFiles;
+    private final MediaUrls mediaUrls;
 
-    public CustomerService(CustomerRepository customerRepository) {
+    public CustomerService(CustomerRepository customerRepository, MediaFiles mediaFiles, MediaUrls mediaUrls) {
         this.customerRepository = customerRepository;
+        this.mediaFiles = mediaFiles;
+        this.mediaUrls = mediaUrls;
     }
 
     public CustomerResponse findById(Long id) {
-        return customerRepository.findById(id)
-                .map(CustomerResponse::from)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", id));
+        return CustomerResponse.from(getCustomer(id), mediaUrls);
     }
 
     public CustomerResponse findByExternalId(String externalId) {
         return customerRepository.findByExternalId(externalId)
-                .map(CustomerResponse::from)
+                .map(customer -> CustomerResponse.from(customer, mediaUrls))
                 .orElseThrow(() -> new ResourceNotFoundException("Customer of user " + externalId + " not found"));
+    }
+
+    /** Profile photo of a Keycloak user, without creating the customer: null when none (or no customer yet). */
+    public String findAvatarUrl(String externalId) {
+        return customerRepository.findByExternalId(externalId)
+                .map(customer -> mediaUrls.of(customer.getAvatarKey()))
+                .orElse(null);
+    }
+
+    /** Replaces the profile photo; the previous one is deleted once the change is committed. */
+    @Transactional
+    public CustomerResponse replaceAvatar(Long customerId, MultipartFile file) {
+        Customer customer = getCustomer(customerId);
+        String previous = customer.getAvatarKey();
+        customer.setAvatarKey(mediaFiles.store(ImageKind.AVATAR, file));
+        mediaFiles.deleteAfterCommit(previous);
+        return CustomerResponse.from(customer, mediaUrls);
+    }
+
+    @Transactional
+    public void deleteAvatar(Long customerId) {
+        Customer customer = getCustomer(customerId);
+        mediaFiles.deleteAfterCommit(customer.getAvatarKey());
+        customer.setAvatarKey(null);
     }
 
     /**
@@ -58,7 +88,11 @@ public class CustomerService {
                         : Optional.<Customer>empty())
                 .orElseGet(() -> new Customer(identity.subject(), email, fullName));
         customer.updateProfile(email, fullName);
-        return CustomerResponse.from(customerRepository.saveAndFlush(customer));
+        return CustomerResponse.from(customerRepository.saveAndFlush(customer), mediaUrls);
+    }
+
+    private Customer getCustomer(Long id) {
+        return customerRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Customer", id));
     }
 
     private static String truncate(String name) {

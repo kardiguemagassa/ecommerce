@@ -3,6 +3,9 @@ package com.kmgtechnologies.ecommerce.service;
 import com.kmgtechnologies.ecommerce.dto.CustomerResponse;
 import com.kmgtechnologies.ecommerce.entity.Customer;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
+import com.kmgtechnologies.ecommerce.media.ImageKind;
+import com.kmgtechnologies.ecommerce.media.MediaFiles;
+import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CustomerRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.Optional;
 
@@ -28,6 +32,12 @@ class CustomerServiceTest {
 
     @Mock
     private CustomerRepository customerRepository;
+
+    @Mock
+    private MediaFiles mediaFiles;
+
+    @Mock
+    private MediaUrls mediaUrls;
 
     @InjectMocks
     private CustomerService customerService;
@@ -109,5 +119,51 @@ class CustomerServiceTest {
         assertThatThrownBy(() -> customerService.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Customer with id 99 not found");
+    }
+
+    @Test
+    void replaceAvatar_storesTheNewPhoto_andDeletesThePreviousOneOnceCommitted() {
+        Customer alice = new Customer(SUBJECT, "alice@example.com", "Alice");
+        alice.setAvatarKey("avatars/old.jpg");
+        MockMultipartFile file = new MockMultipartFile("file", "me.png", "image/png", new byte[]{1});
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(alice));
+        when(mediaFiles.store(ImageKind.AVATAR, file)).thenReturn("avatars/new.jpg");
+        when(mediaUrls.of("avatars/new.jpg")).thenReturn("http://media.test/avatars/new.jpg");
+
+        CustomerResponse response = customerService.replaceAvatar(1L, file);
+
+        assertThat(alice.getAvatarKey()).isEqualTo("avatars/new.jpg");
+        assertThat(response.avatarUrl()).isEqualTo("http://media.test/avatars/new.jpg");
+        verify(mediaFiles).deleteAfterCommit("avatars/old.jpg");
+    }
+
+    @Test
+    void deleteAvatar_removesTheReference_andThePhotoOnceCommitted() {
+        Customer alice = new Customer(SUBJECT, "alice@example.com", "Alice");
+        alice.setAvatarKey("avatars/old.jpg");
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(alice));
+
+        customerService.deleteAvatar(1L);
+
+        assertThat(alice.getAvatarKey()).isNull();
+        verify(mediaFiles).deleteAfterCommit("avatars/old.jpg");
+    }
+
+    @Test
+    void findAvatarUrl_neverCreatesTheCustomer() {
+        when(customerRepository.findByExternalId(SUBJECT)).thenReturn(Optional.empty());
+
+        assertThat(customerService.findAvatarUrl(SUBJECT)).isNull();
+        verify(customerRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void findAvatarUrl_returnsThePublicUrlOfThePhoto() {
+        Customer alice = new Customer(SUBJECT, "alice@example.com", "Alice");
+        alice.setAvatarKey("avatars/me.jpg");
+        when(customerRepository.findByExternalId(SUBJECT)).thenReturn(Optional.of(alice));
+        when(mediaUrls.of("avatars/me.jpg")).thenReturn("http://media.test/avatars/me.jpg");
+
+        assertThat(customerService.findAvatarUrl(SUBJECT)).isEqualTo("http://media.test/avatars/me.jpg");
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
+import com.kmgtechnologies.ecommerce.exception.UnsupportedImageException;
 import com.kmgtechnologies.ecommerce.service.ProductService;
 import com.kmgtechnologies.ecommerce.security.BffTestConfiguration;
 import com.kmgtechnologies.ecommerce.security.SecurityConfig;
@@ -19,7 +20,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -35,6 +38,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -47,7 +51,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductControllerTest {
 
     private static final ProductResponse LAPTOP = new ProductResponse(
-            1L, "Laptop", "15 inch", new BigDecimal("999.99"), 10, 2L, "Electronics");
+            1L, "Laptop", "15 inch", new BigDecimal("999.99"), 10, 2L, "Electronics",
+            "http://media.test/ecommerce-media/products/laptop.jpg");
+
+    private static final MockMultipartFile IMAGE = new MockMultipartFile("file", "laptop.png", "image/png", new byte[]{1});
 
     private static final String LAPTOP_JSON = """
             {"name": "Laptop", "description": "15 inch", "price": 999.99, "stock": 10, "categoryId": 2}
@@ -111,7 +118,8 @@ class ProductControllerTest {
 
         mockMvc.perform(get("/api/products/1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.price").value(999.99));
+                .andExpect(jsonPath("$.price").value(999.99))
+                .andExpect(jsonPath("$.imageUrl").value("http://media.test/ecommerce-media/products/laptop.jpg"));
     }
 
     @Test
@@ -226,5 +234,60 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
 
         verifyNoInteractions(productService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void replaceImage_returnsTheProductWithItsNewImage() throws Exception {
+        when(productService.replaceImage(eq(1L), any())).thenReturn(LAPTOP);
+
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/products/1/image").file(IMAGE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl").value("http://media.test/ecommerce-media/products/laptop.jpg"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void replaceImage_returns415ForAFileThatIsNotAnImage() throws Exception {
+        when(productService.replaceImage(eq(1L), any())).thenThrow(new UnsupportedImageException());
+
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/products/1/image").file(IMAGE))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_IMAGE"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void replaceImage_returns400WithoutFile() throws Exception {
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/products/1/image"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(productService);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void replaceImage_isForbiddenToCustomers() throws Exception {
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/products/1/image").file(IMAGE))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(productService);
+    }
+
+    @Test
+    void replaceImage_requiresAuthentication() throws Exception {
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/products/1/image").file(IMAGE))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(productService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void deleteImage_returns204() throws Exception {
+        mockMvc.perform(delete("/api/products/1/image"))
+                .andExpect(status().isNoContent());
+
+        verify(productService).deleteImage(1L);
     }
 }
