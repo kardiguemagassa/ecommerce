@@ -9,6 +9,7 @@ import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.service.OrderService;
 import com.kmgtechnologies.ecommerce.security.CurrentCustomer;
+import com.kmgtechnologies.ecommerce.security.BffTestConfiguration;
 import com.kmgtechnologies.ecommerce.security.SecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.context.annotation.Import;
@@ -42,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OrderController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, BffTestConfiguration.class})
 @WithMockUser(roles = "CUSTOMER")
 class OrderControllerTest {
 

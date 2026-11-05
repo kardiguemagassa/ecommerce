@@ -5,6 +5,7 @@ import com.kmgtechnologies.ecommerce.dto.OrderSummaryResponse;
 import com.kmgtechnologies.ecommerce.entity.OrderStatus;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.security.CurrentCustomer;
+import com.kmgtechnologies.ecommerce.security.BffTestConfiguration;
 import com.kmgtechnologies.ecommerce.security.SecurityConfig;
 import com.kmgtechnologies.ecommerce.service.CustomerService;
 import com.kmgtechnologies.ecommerce.service.OrderService;
@@ -33,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(CustomerController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, BffTestConfiguration.class})
 @ActiveProfiles("test")
 class CustomerControllerTest {
 

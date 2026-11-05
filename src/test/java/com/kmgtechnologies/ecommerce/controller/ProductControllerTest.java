@@ -7,6 +7,7 @@ import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.service.ProductService;
+import com.kmgtechnologies.ecommerce.security.BffTestConfiguration;
 import com.kmgtechnologies.ecommerce.security.SecurityConfig;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ProductController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, BffTestConfiguration.class})
 @ActiveProfiles("test")
 class ProductControllerTest {
 

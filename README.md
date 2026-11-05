@@ -158,8 +158,25 @@ silently skipping V1.
 
 ### Security
 
-The API is an OAuth2 **resource server**: every protected call carries a Keycloak access token
-(`Authorization: Bearer …`), checked for its signature (realm keys), issuer, audience `ecommerce-api` and expiry.
+Two ways in, one set of rules:
+
+| Client | Authentication | Where the tokens are |
+|---|---|---|
+| Browser (React front-end, v2.0.0) | **Backend for Frontend**: `/oauth2/authorization/keycloak` signs in with Keycloak (authorization code + PKCE, confidential client `ecommerce-bff`), then an `HttpOnly`, `SameSite=Lax` session cookie | On the server only: JavaScript never sees a token |
+| Swagger UI, curl, other services | OAuth2 **resource server**: `Authorization: Bearer <access token>`, checked for signature (realm keys), issuer, audience `ecommerce-api` and expiry | With the client |
+
+Browser sessions:
+
+- `GET /api/me/session` (public) tells the front-end whether it is signed in, with the name, e-mail and roles, never
+  a token; it also sets the `XSRF-TOKEN` cookie.
+- Writes made with the session cookie need that token back in the `X-XSRF-TOKEN` header (CSRF); bearer-token calls
+  are not concerned (a browser never sends a bearer token on its own).
+- `POST /logout` closes the session and answers `{"logoutUrl": ...}`: the Keycloak end-session URL the front-end
+  navigates to, so that single sign-on does not log the user back in.
+- After login and logout the browser lands on `BFF_FRONT_URL` (`/api/me/session` until the front-end exists).
+
+Swagger UI: **Authorize** signs in with Keycloak (public client `ecommerce-swagger`, PKCE), then sends the token
+with every call.
 
 | Routes | Access |
 |---|---|
@@ -322,16 +339,16 @@ shared by all Spring contexts.
 | Repositories | `@DataJpaTest` on PostgreSQL | Migrations, queries, projections, constraints |
 | Controllers | `@WebMvcTest` | Validation, status codes, RFC 9457 payloads |
 | Observability | JUnit, OpenTelemetry SDK (in-memory) | Noise filter, logs exported with their trace id, `traceId` in errors |
-| Security | `@WebMvcTest` with `@WithMockUser`, JUnit | 401 / 403 per route, customer taken from the token, first-call provisioning |
+| Security | `@WebMvcTest` with `@WithMockUser` / `oidcLogin()`, JUnit | 401 / 403 per route, CSRF on session writes, session endpoint, logout URL, roles of the ID token, first-call provisioning |
 | Integration (`*IT`) | `@SpringBootTest` | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch |
 
-195 tests (176 unit/slice, 19 integration). Coverage report: `target/site/jacoco/index.html`.
+208 tests (188 unit/slice, 20 integration). Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 
 | Limitation | Next step |
 |---|---|
-| Browser clients must handle tokens themselves | Backend for frontend: browser login through the API, tokens kept server-side (next) |
+| In-memory sessions: one API instance, sessions lost on restart | Spring Session with Redis or JDBC when running several instances |
 | Confirmation is lost if the app stops between commit and email (order stays `PENDING`) | Transactional outbox + retry, or a message broker |
 | Caffeine is local to one instance | Redis when running several instances |
 | `name LIKE '%x%'` cannot use a B-tree index | PostgreSQL `pg_trgm` GIN index or full-text search |
