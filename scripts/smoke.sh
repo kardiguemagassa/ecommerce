@@ -12,6 +12,7 @@
 #   7. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
 #   8. the confirmation log lines of that trace reach Loki
 #   9. image uploads are rate limited (429): last, not to slow the other checks down
+#  10. the data it created (category "Smoke …", its product and order) is removed: scripts/clean-test-data.sh
 # Tokens of the demo users come from scripts/dev-token.sh (password grant on a development-only client).
 # Grafana's data source proxy is used for Tempo and Loki (admin/admin, development backend only).
 set -euo pipefail
@@ -75,6 +76,8 @@ product=$(body "$response" | json "['id']")
 response=$(call GET /me "$ALICE")
 expect "$response" 200 "customer profile"
 [ "$(body "$response" | json "['email']")" = "$CUSTOMER" ] || fail "profile e-mail is not $CUSTOMER"
+# An empty cart first: the order must hold the test product only (a cart left by earlier use would add real products).
+expect "$(call DELETE /me/cart "$ALICE")" 204 "cart emptied before the order"
 # JSON built first: macOS bash 3.2 mangles escaped quotes inside a quoted command substitution.
 item="{\"productId\":$product,\"quantity\":2}"
 response=$(call POST /me/cart/items "$ALICE" "$item")
@@ -242,3 +245,6 @@ done
 [ -n "$limited" ] || fail "15 avatar uploads in a row were not rate limited"
 [ "$(json "['code']" <<< "$limited")" = RATE_LIMITED ] || fail "rate limit answer is not a RATE_LIMITED problem: $limited"
 echo "OK  image uploads rate limited by nginx (429 RATE_LIMITED)"
+
+# --- Test data: the developer's catalogue keeps only its own (KEEP_TEST_DATA=1 keeps it) ----------------------------
+./scripts/clean-test-data.sh

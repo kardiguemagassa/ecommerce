@@ -4,6 +4,20 @@ Notable changes of each release. The format follows [Keep a Changelog](https://k
 versions [Semantic Versioning](https://semver.org/). Each release publishes two images on Docker Hub:
 `kardigue/ecommerce-api` and `kardigue/ecommerce-web`.
 
+## [2.0.1] - 2026-11-06
+
+### Fixed
+
+- Product images are no longer cropped: the API keeps the whole picture (reduced within 1200 x 900, never enlarged) and
+  the shop fits it in its 4:3 frame on white, so a portrait product (a kettle, a coffee maker) is shown entire. Images
+  uploaded before 2.0.1 were cropped when stored: upload them again. Profile photos stay square, shown in a circle.
+- Catalogue: the category filter stays on one line that scrolls sideways, whatever the number of categories (faded
+  edges, arrows for the mouse on wider screens, selected and focused category kept in view), instead of pushing the
+  products down.
+- Test data no longer piles up in a development database: `scripts/clean-test-data.sh` removes what the end-to-end
+  tests and the smoke test created, at the end of each run (`KEEP_TEST_DATA=1` keeps it). The smoke test empties the
+  demo customer's cart before ordering, so its order holds the test product only.
+
 ## [2.0.0] - 2026-11-06
 
 The shop gets its front-end: **Comptoir**, a React application served by nginx, in front of the API. 2.0.0 because
@@ -72,6 +86,7 @@ the stack changes shape: the API is no longer published on its own port, everyth
 - Actuator and business metrics on a dedicated management port, Prometheus and Grafana.
 - Unit, slice and integration tests, JaCoCo coverage.
 
+[2.0.1]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/kardiguemagassa/ecommerce/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/kardiguemagassa/ecommerce/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/kardiguemagassa/ecommerce/compare/v1.0.0...v1.1.0

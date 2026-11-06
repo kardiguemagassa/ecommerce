@@ -29,16 +29,44 @@ class ImageProcessorTest {
     private final ImageProcessor processor = new ImageProcessor();
 
     @Test
-    void png_isCroppedTo4By3AndReEncodedAsJpeg() throws IOException {
+    void png_isReEncodedAsJpeg_keepingTheWholePicture() throws IOException {
         ProcessedImage image = processor.process(ImageKind.PRODUCT, encode(picture(800, 400, Color.ORANGE), "png"));
 
         assertThat(image.sourceFormat()).isEqualTo("png");
-        assertThat(image.width()).isEqualTo(533);
+        assertThat(image.width()).isEqualTo(800);
         assertThat(image.height()).isEqualTo(400);
         assertThat(image.jpeg()).startsWith((byte) 0xFF, (byte) 0xD8, (byte) 0xFF);
         BufferedImage decoded = decode(image.jpeg());
-        assertThat(decoded.getWidth()).isEqualTo(533);
+        assertThat(decoded.getWidth()).isEqualTo(800);
         assertThat(decoded.getHeight()).isEqualTo(400);
+    }
+
+    @Test
+    void portraitProduct_isReducedWithoutBeingCut() throws IOException {
+        // A kettle photographed upright: red band at the top, blue at the bottom; both must survive.
+        BufferedImage portrait = picture(1500, 3000, Color.WHITE);
+        Graphics2D g = portrait.createGraphics();
+        g.setColor(Color.RED);
+        g.fillRect(0, 0, 1500, 200);
+        g.setColor(Color.BLUE);
+        g.fillRect(0, 2800, 1500, 200);
+        g.dispose();
+
+        ProcessedImage image = processor.process(ImageKind.PRODUCT, encode(portrait, "png"));
+
+        assertThat(image.width()).isEqualTo(450);
+        assertThat(image.height()).isEqualTo(900);
+        BufferedImage decoded = decode(image.jpeg());
+        assertThat(isClose(new Color(decoded.getRGB(225, 10)), Color.RED)).isTrue();
+        assertThat(isClose(new Color(decoded.getRGB(225, 890)), Color.BLUE)).isTrue();
+    }
+
+    @Test
+    void wideProduct_isReducedToTheWidthOfItsUse() throws IOException {
+        ProcessedImage image = processor.process(ImageKind.PRODUCT, encode(picture(3200, 1200, Color.GRAY), "jpeg"));
+
+        assertThat(image.width()).isEqualTo(1200);
+        assertThat(image.height()).isEqualTo(450);
     }
 
     @Test
@@ -56,11 +84,15 @@ class ImageProcessorTest {
     }
 
     @Test
-    void smallPicture_isCroppedButNeverEnlarged() throws IOException {
-        ProcessedImage image = processor.process(ImageKind.AVATAR, encode(picture(120, 80, Color.GREEN), "png"));
+    void smallPicture_isNeverEnlarged_andCroppedToASquareForAProfilePhoto() throws IOException {
+        byte[] small = encode(picture(120, 80, Color.GREEN), "png");
 
-        assertThat(image.width()).isEqualTo(80);
-        assertThat(image.height()).isEqualTo(80);
+        ProcessedImage avatar = processor.process(ImageKind.AVATAR, small);
+        assertThat(avatar.width()).isEqualTo(80);
+        assertThat(avatar.height()).isEqualTo(80);
+        ProcessedImage product = processor.process(ImageKind.PRODUCT, small);
+        assertThat(product.width()).isEqualTo(120);
+        assertThat(product.height()).isEqualTo(80);
     }
 
     @Test
@@ -95,9 +127,9 @@ class ImageProcessorTest {
         ProcessedImage image = processor.process(ImageKind.PRODUCT, photo);
 
         assertThat(new String(image.jpeg(), StandardCharsets.ISO_8859_1)).doesNotContain("Exif");
-        // Upright: 200 x 400 portrait, cropped to 4:3 from its centre.
+        // Upright: the 200 x 400 portrait, whole.
         assertThat(image.width()).isEqualTo(200);
-        assertThat(image.height()).isEqualTo(150);
+        assertThat(image.height()).isEqualTo(400);
     }
 
     @ParameterizedTest(name = "orientation {0}: red corner at {1}")
@@ -206,5 +238,12 @@ class ImageProcessorTest {
         data[offset + 1] = (byte) (value >>> 16);
         data[offset + 2] = (byte) (value >>> 8);
         data[offset + 3] = (byte) value;
+    }
+
+    /** JPEG shifts colours a little: close enough on each channel. */
+    private static boolean isClose(Color actual, Color expected) {
+        return Math.abs(actual.getRed() - expected.getRed()) < 40
+                && Math.abs(actual.getGreen() - expected.getGreen()) < 40
+                && Math.abs(actual.getBlue() - expected.getBlue()) < 40;
     }
 }
