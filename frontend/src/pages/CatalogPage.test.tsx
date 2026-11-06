@@ -127,6 +127,31 @@ describe('Adding to the cart', () => {
     expect(posted).toBe(false);
   });
 
+  it('waits for the session when clicked before it is known, so a customer is never asked to sign in', async () => {
+    const user = userEvent.setup();
+    let answerSession!: () => void;
+    let added: unknown;
+    server.use(
+      http.get('*/api/me/session', async () => {
+        await new Promise<void>((resolve) => (answerSession = resolve));
+        return HttpResponse.json(alice);
+      }),
+      http.post('*/api/me/cart/items', async ({ request }) => {
+        added = await request.json();
+        return HttpResponse.json({ ...emptyCart, totalQuantity: 1, total: 89.9 });
+      }),
+    );
+    renderApp('/');
+
+    await user.click(await screen.findByRole('button', { name: `Ajouter ${keyboard.name} au panier` }));
+    expect(added).toBeUndefined(); // the session is still unknown
+    answerSession();
+
+    expect(await screen.findByText('Clavier mécanique TKL ajouté au panier')).toBeInTheDocument();
+    expect(added).toEqual({ productId: 10, quantity: 1 });
+    expect(screen.queryByText('Connectez-vous pour ajouter des produits au panier.')).not.toBeInTheDocument();
+  });
+
   it('explains an insufficient stock in French', async () => {
     const user = userEvent.setup();
     sessionOf(alice);

@@ -248,7 +248,8 @@ silently skipping V1.
 | `GET` | `/api/me` | My customer profile (created on the first call) |
 | `PUT` `DELETE` | `/api/me/avatar` | Replace (multipart `file`) / delete my profile photo |
 | `GET` `DELETE` | `/api/me/cart` | Get / empty my cart |
-| `POST` | `/api/me/cart/items` | Add a product |
+| `POST` | `/api/me/cart/items` | Add a product (adds to the quantity already in the cart) |
+| `PUT` | `/api/me/cart/items/{productId}` | Set the quantity of a line (stock checked, `409` above it) |
 | `DELETE` | `/api/me/cart/items/{productId}` | Remove a product |
 | `POST` | `/api/me/orders` | Place an order from my cart |
 | `GET` | `/api/me/orders` | My order history (paginated, newest first) |
@@ -266,8 +267,9 @@ Two ways in, one set of rules:
 
 Browser sessions:
 
-- `GET /api/me/session` (public) tells the front-end whether it is signed in, with the name, e-mail and roles, never
-  a token; it also sets the `XSRF-TOKEN` cookie.
+- `GET /api/me/session` (public) tells the front-end whether it is signed in, with the name, e-mail, roles, photo and
+  the link of the Keycloak account console (`accountUrl`: name, e-mail and password are changed there), never a
+  token; it also sets the `XSRF-TOKEN` cookie.
 - Writes made with the session cookie need that token back in the `X-XSRF-TOKEN` header (CSRF); bearer-token calls
   are not concerned (a browser never sends a bearer token on its own).
 - `POST /logout` closes the session and answers `{"logoutUrl": ...}`: the Keycloak end-session URL the front-end
@@ -446,7 +448,7 @@ http://localhost:3000 (admin / admin):
 - **Explore → Loki**: `{service_name="ecommerce"} | trace_id="<traceId>"` for the logs of one request
 
 `./scripts/smoke.sh` does all of this automatically against the running stack (also run by CI): it places an order,
-uploads a product image and a profile photo (read back from the media storage, then deleted), then checks the
+changes a cart quantity through the browser session (and is refused above the stock), uploads a product image and a profile photo (read back from the media storage, then deleted), then checks the
 `traceId` of an error, the order trace in Tempo and its confirmation logs in Loki.
 
 ## Tests
@@ -470,9 +472,9 @@ shared by all Spring contexts.
 | Security | `@WebMvcTest` with `@WithMockUser` / `oidcLogin()`, JUnit | 401 / 403 per route, CSRF on session writes, session endpoint, logout URL, roles of the ID token, first-call provisioning |
 | Images | JUnit, Mockito | Format detection, decompression bombs, EXIF orientation and removal, crop and size, storage kept in step with commits and rollbacks |
 | Integration (`*IT`) | `@SpringBootTest`, Testcontainers SeaweedFS | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch, images served publicly and deleted |
-| Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors (429, 413 included), header signed in or not, protected pages, session expiry, toasts (queue, durations, roles, actions), lazy routes (titles, focus, stale chunk after a deployment), catalogue (URL state sent to the API, filters, pagination links, empty results, best sellers), product page (quantity bounds, 404), add to cart (badge, toasts, anonymous visitor, insufficient stock) |
+| Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors (429, 413 included), header signed in or not, protected pages, session expiry, toasts (queue, durations, roles, actions), lazy routes (titles, focus, stale chunk after a deployment), catalogue (URL state sent to the API, filters, pagination links, empty results, best sellers), product page (quantity bounds, 404), add to cart (badge, toasts, anonymous visitor, click before the session is known, insufficient stock), cart (optimistic quantity rolled back on a 409, remove and undo, clear after confirmation, empty cart, anonymous visitor without call), order (placed then tracked, polling stopped once confirmed, 404 in the page), order history (page from the address), profile photo (checked before upload, preview, multipart upload, header updated, deletion confirmed), account console link |
 
-273 tests (244 unit/slice, 29 integration), plus 54 front-end tests. Coverage report: `target/site/jacoco/index.html`.
+284 tests (255 unit/slice, 29 integration), plus 74 front-end tests. Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 

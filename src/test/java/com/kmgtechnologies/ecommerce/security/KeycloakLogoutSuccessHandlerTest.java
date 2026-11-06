@@ -20,7 +20,8 @@ class KeycloakLogoutSuccessHandlerTest {
 
     private static final BffProperties BFF = new BffProperties(
             URI.create("http://localhost:8080/api/me/session"),
-            URI.create("http://localhost:8180/realms/ecommerce/protocol/openid-connect/logout"));
+            URI.create("http://localhost:8180/realms/ecommerce/protocol/openid-connect/logout"),
+            URI.create("http://localhost:8180/realms/ecommerce/account"));
 
     private final KeycloakLogoutSuccessHandler handler = new KeycloakLogoutSuccessHandler(BFF);
 
@@ -52,7 +53,7 @@ class KeycloakLogoutSuccessHandlerTest {
     @Test
     void relativeFrontEnd_isResolvedAgainstTheAddressTheBrowserUsed() {
         KeycloakLogoutSuccessHandler relative = new KeycloakLogoutSuccessHandler(new BffProperties(URI.create("/"),
-                URI.create("http://localhost:8180/realms/ecommerce/protocol/openid-connect/logout")));
+                URI.create("http://localhost:8180/realms/ecommerce/protocol/openid-connect/logout"), BFF.accountUri()));
         MockHttpServletRequest throughNginx = new MockHttpServletRequest("POST", "/logout");
         throughNginx.setServerName("localhost");
         throughNginx.setServerPort(8080);

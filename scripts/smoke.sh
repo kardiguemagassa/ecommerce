@@ -112,6 +112,20 @@ code=$(browser -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: applicat
 [ "$code" = 200 ] || fail "BFF session write with CSRF token: HTTP $code instead of 200"
 echo "OK  session writes need the CSRF token (403 without, 200 with)"
 
+quantity=$(browser -X PUT -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $xsrf" -d '{"quantity":3}' \
+  "$API/me/cart/items/$product" | json "['totalQuantity']")
+[ "$quantity" = 3 ] || fail "cart quantity change: $quantity items instead of 3"
+code=$(browser -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $xsrf" \
+  -d '{"quantity":11}' "$API/me/cart/items/$product")
+[ "$code" = 409 ] || fail "cart quantity above stock: HTTP $code instead of 409"
+code=$(browser -o /dev/null -w '%{http_code}' -X DELETE -H "X-XSRF-TOKEN: $xsrf" "$API/me/cart")
+[ "$code" = 204 ] || fail "cart cleared: HTTP $code instead of 204"
+case "$(browser "$API/me/session" | json "['accountUrl']")" in
+  "$KEYCLOAK"/realms/ecommerce/account) ;;
+  *) fail "session: no Keycloak account console link" ;;
+esac
+echo "OK  cart quantity set (200, 409 above stock), cart cleared, account console link in the session"
+
 logout=$(browser -X POST -H "X-XSRF-TOKEN: $xsrf" "$BASE/logout")
 case "$(json "['logoutUrl']" <<< "$logout")" in
   "$KEYCLOAK"/realms/ecommerce/protocol/openid-connect/logout\?*id_token_hint=*) ;;

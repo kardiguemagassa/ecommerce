@@ -39,6 +39,7 @@ class SessionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(false))
                 .andExpect(jsonPath("$.roles").isEmpty())
+                .andExpect(jsonPath("$.accountUrl").doesNotExist())
                 .andExpect(cookie().exists("XSRF-TOKEN"))
                 .andExpect(cookie().httpOnly("XSRF-TOKEN", false));
 
@@ -61,6 +62,7 @@ class SessionControllerTest {
                 .andExpect(jsonPath("$.email").value("alice@example.com"))
                 .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"))
                 .andExpect(jsonPath("$.roles.length()").value(1))
-                .andExpect(jsonPath("$.avatarUrl").value("http://media.test/avatars/alice.jpg"));
+                .andExpect(jsonPath("$.avatarUrl").value("http://media.test/avatars/alice.jpg"))
+                .andExpect(jsonPath("$.accountUrl").value("http://localhost:8180/realms/ecommerce/account"));
     }
 }

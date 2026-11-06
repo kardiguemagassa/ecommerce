@@ -4,6 +4,16 @@ import { afterAll, afterEach, beforeAll } from 'vitest';
 import { clearToasts } from '../app/notifications';
 import { server } from './server';
 
+// jsdom's Blob (and File) has no stream(), which Node's fetch reads to send a multipart body (photo upload).
+Blob.prototype.stream ??= function stream(this: Blob) {
+  return new ReadableStream<Uint8Array<ArrayBuffer>>({
+    start: async (controller) => {
+      controller.enqueue(new Uint8Array(await this.arrayBuffer()));
+      controller.close();
+    },
+  });
+};
+
 // findBy* and waitFor wait 1 s by default: too short for a first render on a slower machine.
 configure({ asyncUtilTimeout: 5_000 });
 

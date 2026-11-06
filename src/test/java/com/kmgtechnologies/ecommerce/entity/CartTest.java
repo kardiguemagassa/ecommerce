@@ -70,6 +70,24 @@ class CartTest {
     }
 
     @Test
+    void changeQuantity_replacesTheQuantityAndReportsWhetherTheLineExists() {
+        cart.addItem(laptop, 3);
+
+        assertThat(cart.changeQuantity(1L, 1)).isTrue();
+        assertThat(cart.changeQuantity(2L, 1)).isFalse();
+        assertThat(cart.getItems()).singleElement()
+                .satisfies(item -> assertThat(item.getQuantity()).isEqualTo(1));
+    }
+
+    @Test
+    void changeQuantity_rejectsNonPositiveQuantity() {
+        cart.addItem(laptop, 3);
+
+        assertThatThrownBy(() -> cart.changeQuantity(1L, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void removeItem_removesLineAndReportsWhetherItExisted() {
         cart.addItem(laptop, 1);
         cart.addItem(mouse, 1);

@@ -2,6 +2,7 @@ package com.kmgtechnologies.ecommerce.service;
 
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CartResponse;
+import com.kmgtechnologies.ecommerce.dto.UpdateCartItemRequest;
 import com.kmgtechnologies.ecommerce.entity.Cart;
 import com.kmgtechnologies.ecommerce.entity.CartItem;
 import com.kmgtechnologies.ecommerce.entity.Customer;
@@ -59,11 +60,21 @@ public class CartService {
     }
 
     @Transactional
+    public CartResponse changeQuantity(Long customerId, Long productId, UpdateCartItemRequest request) {
+        Cart cart = existingCart(customerId, productId);
+        CartItem line = cart.findItem(productId).orElseThrow(() -> notInCart(productId));
+        Product product = line.getProduct();
+        if (request.quantity() > product.getStock()) {
+            throw new InsufficientStockException(product.getName(), request.quantity(), product.getStock());
+        }
+
+        cart.changeQuantity(productId, request.quantity());
+        return CartResponse.from(customerId, cart, mediaUrls);
+    }
+
+    @Transactional
     public CartResponse removeItem(Long customerId, Long productId) {
-        Cart cart = cartRepository.findWithItemsByCustomerId(customerId)
-                .orElseThrow(() -> customerRepository.existsById(customerId)
-                        ? notInCart(productId)
-                        : new ResourceNotFoundException("Customer", customerId));
+        Cart cart = existingCart(customerId, productId);
 
         if (!cart.removeItem(productId)) {
             throw notInCart(productId);
@@ -75,6 +86,14 @@ public class CartService {
     public void clear(Long customerId) {
         ensureCustomerExists(customerId);
         cartRepository.findWithItemsByCustomerId(customerId).ifPresent(Cart::clear);
+    }
+
+    /** The customer's cart; without one, the product is not in the cart (404), or the customer does not exist. */
+    private Cart existingCart(Long customerId, Long productId) {
+        return cartRepository.findWithItemsByCustomerId(customerId)
+                .orElseThrow(() -> customerRepository.existsById(customerId)
+                        ? notInCart(productId)
+                        : new ResourceNotFoundException("Customer", customerId));
     }
 
     private Cart createCart(Long customerId) {

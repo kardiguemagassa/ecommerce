@@ -50,6 +50,10 @@ public class CartItem {
         this.quantity += amount;
     }
 
+    void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
     public BigDecimal getSubtotal() {
         return product.getPrice().multiply(BigDecimal.valueOf(quantity));
     }
