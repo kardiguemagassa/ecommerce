@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderApp } from '../test/render';
 import { alice, server, sessionOf } from '../test/server';
 
-describe('Error notification', () => {
-  it('shows the French message and the trace id of a failed call, which the user can copy', async () => {
+describe('Failed API calls', () => {
+  it('show the French message and the trace id, which the user can copy', async () => {
     const user = userEvent.setup();
     const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
     sessionOf(alice);
@@ -29,7 +29,7 @@ describe('Error notification', () => {
     expect(screen.getByRole('button', { name: 'Copié' })).toBeInTheDocument();
   });
 
-  it('switches the header back to "Se connecter" when the session has expired', async () => {
+  it('switch the header back to "Se connecter" when the session has expired', async () => {
     sessionOf(alice);
     server.use(
       http.get('*/api/me/cart', () => {

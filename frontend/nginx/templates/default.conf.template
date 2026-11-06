@@ -1,0 +1,156 @@
+# The shop's single entry point: the React front-end, the API and the media, on one origin.
+# Rendered at startup by the image's entrypoint (envsubst): ${API_UPSTREAM}, ${MEDIA_UPSTREAM}, ${MEDIA_BUCKET},
+# ${KEYCLOAK_ORIGIN} (Swagger UI sign-in), ${NGINX_LOCAL_RESOLVERS} (the container's DNS servers).
+
+# Upstreams resolved at request time, not once at startup: a restarted API container gets a new address.
+resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+resolver_timeout 5s;
+
+# Image uploads: 10 per minute per client, bursts of 5 (avatar and product image).
+limit_req_zone $binary_remote_addr zone=uploads:10m rate=10r/m;
+limit_req_status 429;
+limit_req_log_level warn;
+
+# What the browser used, for the API's redirects (OAuth2 login, logout). Behind a TLS-terminating load balancer
+# (production), its X-Forwarded-Proto/Port are kept; otherwise nginx is the edge: its scheme, and the port of the Host
+# header (the published port, not the 8080 nginx listens on inside the container), 80 when absent.
+map $http_x_forwarded_proto $forwarded_proto {
+    ""                      $scheme;
+    default                 $http_x_forwarded_proto;
+}
+map $http_host $host_port {
+    "~:(?<port>[0-9]+)$"    $port;
+    default                 80;
+}
+map $http_x_forwarded_port $forwarded_port {
+    ""                      $host_port;
+    default                 $http_x_forwarded_port;
+}
+
+server {
+    listen 8080;
+    server_name _;
+    server_tokens off;
+
+    root /usr/share/nginx/html;
+
+    # Largest image upload (2 MB) plus the multipart envelope; bigger requests stop here.
+    client_max_body_size 3m;
+
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/css application/javascript application/json application/problem+json image/svg+xml;
+
+    set $api http://${API_UPSTREAM};
+    set $media http://${MEDIA_UPSTREAM};
+
+    # --- React front-end -------------------------------------------------------------------------------------------
+    # Routes of the single-page application: any path that is not a file gets index.html, always revalidated so a
+    # deployment is seen at once.
+    location / {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        try_files $uri /index.html;
+    }
+
+    # Bundles: hashed names, never modified, cached for a year. A missing one is a 404, never index.html: a tab still
+    # on the previous release then gets a clean module error and offers to reload (RouteError).
+    location /assets/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    # Source maps stay on the server image only (error tracking), never served.
+    location ~ \.map$ {
+        return 404;
+    }
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # --- API (Backend for Frontend): JSON, browser login and logout ------------------------------------------------
+    # Plain prefix (not ^~): the upload location below, a regular expression, takes precedence for its paths.
+    location /api/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass $api;
+    }
+
+    location ~ ^/api/(me/avatar|products/[0-9]+/image)$ {
+        limit_req zone=uploads burst=5 nodelay;
+        include /etc/nginx/snippets/security-headers.conf;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass $api;
+    }
+
+    location ^~ /oauth2/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass $api;
+    }
+
+    location ^~ /login {
+        include /etc/nginx/snippets/security-headers.conf;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass $api;
+    }
+
+    location = /logout {
+        include /etc/nginx/snippets/security-headers.conf;
+        include /etc/nginx/snippets/proxy.conf;
+        proxy_pass $api;
+    }
+
+    # API documentation (when enabled): Swagger UI needs inline scripts and styles, its own policy.
+    location ~ ^/(swagger-ui|v3/api-docs) {
+        include /etc/nginx/snippets/proxy.conf;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ${KEYCLOAK_ORIGIN}; frame-ancestors 'none'; object-src 'none'" always;
+        add_header X-Content-Type-Options nosniff always;
+        proxy_pass $api;
+    }
+
+    # --- Media: product images and profile photos, read-only -------------------------------------------------------
+    location ^~ /media/ {
+        limit_except GET HEAD {
+            deny all;
+        }
+        include /etc/nginx/snippets/security-headers.conf;
+        rewrite ^/media/(.*)$ /${MEDIA_BUCKET}/$1 break;
+        proxy_pass $media;
+        proxy_set_header Host $proxy_host;
+        # Only what a browser needs from the storage; its own headers stay inside.
+        proxy_hide_header x-amz-request-id;
+        proxy_hide_header x-amz-id-2;
+        proxy_hide_header Server;
+        proxy_intercept_errors on;
+        error_page 403 404 = @media_not_found;
+    }
+
+    location @media_not_found {
+        default_type text/plain;
+        return 404 "Not found\n";
+    }
+
+    # Upload above client_max_body_size: an RFC 9457 problem with the API's code for a too heavy image.
+    error_page 413 = @too_large;
+    location @too_large {
+        include /etc/nginx/snippets/security-headers.conf;
+        default_type application/problem+json;
+        return 413 '{"type":"about:blank","title":"Image too large","status":413,"detail":"The file exceeds the upload limit","code":"IMAGE_TOO_LARGE"}';
+    }
+
+    # Too many uploads: an RFC 9457 problem, like the API's errors (the front-end shows its French message).
+    error_page 429 = @rate_limited;
+    location @rate_limited {
+        include /etc/nginx/snippets/security-headers.conf;
+        default_type application/problem+json;
+        add_header Retry-After 60 always;
+        return 429 '{"type":"about:blank","title":"Too many requests","status":429,"detail":"Too many uploads, retry in a minute","code":"RATE_LIMITED"}';
+    }
+}

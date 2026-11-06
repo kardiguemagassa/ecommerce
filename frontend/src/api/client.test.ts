@@ -69,6 +69,24 @@ describe('API client', () => {
     expect((error as ApiError).message).toBe('Format non accepté : JPEG, PNG ou WebP uniquement.');
   });
 
+  it('explains the limits of nginx: too many uploads, too heavy a file', async () => {
+    server.use(
+      http.put('*/api/me/avatar', () =>
+        HttpResponse.json({ status: 429, code: 'RATE_LIMITED' }, { status: 429, headers: { 'Retry-After': '60' } }),
+      ),
+      http.put('*/api/products/1/image', () => HttpResponse.text('<html>413</html>', { status: 413 })),
+    );
+    const body = new FormData();
+
+    const limited = await unwrap(api.PUT('/api/me/avatar', { body: { file: 'a.png' }, bodySerializer: () => body })).catch((e: unknown) => e);
+    const tooLarge = await unwrap(
+      api.PUT('/api/products/{id}/image', { params: { path: { id: 1 } }, body: { file: 'a.png' }, bodySerializer: () => body }),
+    ).catch((e: unknown) => e);
+
+    expect((limited as ApiError).message).toBe("Trop d'envois en peu de temps. Réessayez dans une minute.");
+    expect((tooLarge as ApiError).message).toBe("L'image est trop lourde.");
+  });
+
   it('reports an unreachable API as unavailable', async () => {
     server.use(http.get('*/api/categories', () => HttpResponse.error()));
 

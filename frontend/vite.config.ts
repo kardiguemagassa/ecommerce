@@ -22,7 +22,11 @@ export default defineConfig({
     },
   },
   build: {
-    sourcemap: true,
+    // Source maps for debugging and error tracking, not referenced by the bundles (nginx does not serve them).
+    sourcemap: 'hidden',
+    // Every asset as a file, nothing inlined as data: URI: the Content Security Policy keeps font-src 'self', and the
+    // files are cached with the bundles.
+    assetsInlineLimit: 0,
     rolldownOptions: {
       output: {
         // Libraries apart from the application code: they change less often, browsers keep them cached across releases.

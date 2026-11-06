@@ -35,6 +35,12 @@ updates:
     target-branch: dev
     schedule:
       interval: weekly
+  # Base images of the web entry point (node, nginx-unprivileged)
+  - package-ecosystem: docker
+    directory: /frontend
+    target-branch: dev
+    schedule:
+      interval: weekly
   # Images run by compose.yml (PostgreSQL, grafana/otel-lgtm)
   - package-ecosystem: docker-compose
     directory: /

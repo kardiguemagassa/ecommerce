@@ -60,7 +60,7 @@ cp .env.example .env
 | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB` | Database location | — |
 | `POSTGRES_USERNAME`, `POSTGRES_PASSWORD` | Database credentials | — |
 | `MANAGEMENT_PORT` | Actuator port | `8081` |
-| `API_PORT` | API port published by Compose | `8080` |
+| `WEB_PORT` | Port of the web entry point (nginx: front-end, `/api`, `/media`) published by Compose | `8080` |
 | `KEYCLOAK_PORT`, `KEYCLOAK_ADMIN_USERNAME`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_PASSWORD` | Keycloak and its admin console | `8180` |
 | `BFF_CLIENT_SECRET` | Secret of the confidential client `ecommerce-bff` | — |
 | `DEMO_USER_PASSWORD` | Password of the demo users (12 characters minimum) | — |
@@ -83,18 +83,21 @@ runs either from the IDE / Maven, or in a container too:
 docker compose up -d --wait
 ./mvnw spring-boot:run
 
-# Everything in Docker
+# Everything in Docker: http://localhost:8080 (nginx: front-end, API, media)
 docker compose --profile app up -d --build --wait
 
-# Stop (data kept); add -v to delete the database volume
+# Stop (data kept): with the profile, or the API and web containers keep running; -v deletes the volumes
 docker compose --profile app down
 ```
 
-Every port is published on `127.0.0.1` only. The API container runs as a non-root user, with a 512 MB
-memory limit from which the JVM sizes its heap.
+Every port is published on `127.0.0.1` only. In Docker, **nginx is the single entry point** (`web` service): the
+React front-end, `/api`, the browser login (`/oauth2`, `/login/oauth2`, `/logout`) and `/media`, on one origin; the
+API port itself is not published. Both containers run as non-root users; the API has a 512 MB memory limit from which
+the JVM sizes its heap, nginx runs on a read-only file system.
 
 | URL | Content |
 |---|---|
+| http://localhost:8080 | The shop (React front-end) |
 | http://localhost:8080/api/... | REST API |
 | http://localhost:8080/swagger-ui.html | Swagger UI |
 | http://localhost:8080/v3/api-docs | OpenAPI document (JSON) |
@@ -102,7 +105,7 @@ memory limit from which the JVM sizes its heap.
 | http://localhost:8081/actuator/metrics | Metrics (also pushed over OTLP) |
 | http://localhost:3000 | Grafana: dashboard, traces, logs (admin / admin) |
 | http://localhost:8180 | Keycloak: admin console (`KEYCLOAK_ADMIN_*`), realm `ecommerce` |
-| http://localhost:8333/ecommerce-media/... | Media storage (S3 API): product images and profile photos, read-only for browsers |
+| http://localhost:8080/media/... | Product images and profile photos (read-only; S3 API of the storage on 8333) |
 
 Ready-to-run requests for the IntelliJ HTTP client are in [`http/`](http/) (environment `dev`). Each file starts by
 signing in; put the demo password (and your `SHOP_ADMIN_EMAIL` as `adminEmail`) in
@@ -116,7 +119,7 @@ http://localhost:5173 and forwards `/api`, `/oauth2`, `/login/oauth2` and `/logo
 browser, so the session cookie and the CSRF token work without CORS.
 
 ```bash
-# API and its services running (see above); in .env: BFF_FRONT_URL=http://localhost:5173/
+# API and its services running (see above: from the IDE, or in Docker)
 cd frontend
 nvm use            # Node.js version of .nvmrc
 npm ci
@@ -130,7 +133,11 @@ npm run dev        # http://localhost:5173
   `src/api/schema.d.ts` is generated (`npm run api:types`, run before `dev`, `build`, `lint`, `typecheck` and `test`).
   `./mvnw verify` exports the live contract to `target/openapi.json`; CI fails when the copy in `frontend/` differs.
   After an API change: `./mvnw verify`, then `npm run api:sync` in `frontend/`, and commit `openapi.json`.
-- **Errors**: every failed call is shown in French, with the `traceId` of the request to quote to the support.
+- **Pages loaded on demand**: each route is its own chunk (React Router `lazy`), with a progress bar while it
+  arrives, the browser tab named after the page, focus moved to the new content after a navigation and a skip link.
+  A page that fails keeps the header usable; after a deployment, a tab on the previous release offers to reload.
+- **Toasts** (`notify.success/info/warning/error`): one at a time in order of arrival; errors in French with the
+  `traceId` of the request to quote to the support, kept until closed; others vanish after 4 to 6 s.
 
 | Command (in `frontend/`) | Purpose |
 |---|---|
@@ -138,6 +145,27 @@ npm run dev        # http://localhost:5173
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript (strict) |
 | `npm test` | Unit and component tests (Vitest, Testing Library, API mocked with MSW) |
 | `npm run build` | Production build in `frontend/dist` |
+
+### Web entry point (nginx)
+
+The `web` image ([`frontend/Dockerfile`](frontend/Dockerfile)) builds the front-end with Node.js and serves it with
+an unprivileged nginx, which also proxies the API and the media
+([configuration](frontend/nginx/templates/default.conf.template)):
+
+| Path | Served by | Notes |
+|---|---|---|
+| `/`, `/produits/…`, `/admin`… | front-end | any other path gets `index.html` (revalidated on every visit) |
+| `/assets/*` | front-end | hashed bundles, cached a year (`immutable`); a missing one is a 404, never `index.html` |
+| `/api/`, `/oauth2/`, `/login/oauth2/`, `/logout` | API | `X-Forwarded-*` headers: Spring builds its redirects on the browser's address |
+| `/media/*` | media storage | `GET` / `HEAD` only |
+
+- **Security headers** on every response: Content Security Policy (`script-src 'self'`: no inline or third-party
+  script; `style-src 'unsafe-inline'` for MUI's injected styles only), `nosniff`, `Referrer-Policy`,
+  `Permissions-Policy`, `frame-ancestors 'none'`, no version in `Server`. HSTS is ready, to enable behind HTTPS.
+- **Uploads**: 3 MB per request at most (413), avatar and product image uploads limited to 10 a minute per client,
+  bursts of 5 (429); both answer an RFC 9457 problem with its `code`, like the API.
+- Upstreams resolved at request time (a restarted API is found again); `API_UPSTREAM`, `MEDIA_UPSTREAM`,
+  `MEDIA_BUCKET` and `KEYCLOAK_ORIGIN` configure the image.
 
 ### Identity provider (Keycloak)
 
@@ -233,7 +261,8 @@ Browser sessions:
   are not concerned (a browser never sends a bearer token on its own).
 - `POST /logout` closes the session and answers `{"logoutUrl": ...}`: the Keycloak end-session URL the front-end
   navigates to, so that single sign-on does not log the user back in.
-- After login and logout the browser lands on `BFF_FRONT_URL` (`/api/me/session` until the front-end exists).
+- After login and logout the browser lands on the front-end: `BFF_FRONT_URL`, `/` by default, resolved against the
+  address the browser used (nginx on 8080, Vite on 5173; forwarded headers trusted from private networks only).
 
 Swagger UI: **Authorize** signs in with Keycloak (public client `ecommerce-swagger`, PKCE), then sends the token
 with every call.
@@ -430,9 +459,9 @@ shared by all Spring contexts.
 | Security | `@WebMvcTest` with `@WithMockUser` / `oidcLogin()`, JUnit | 401 / 403 per route, CSRF on session writes, session endpoint, logout URL, roles of the ID token, first-call provisioning |
 | Images | JUnit, Mockito | Format detection, decompression bombs, EXIF orientation and removal, crop and size, storage kept in step with commits and rollbacks |
 | Integration (`*IT`) | `@SpringBootTest`, Testcontainers SeaweedFS | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch, images served publicly and deleted |
-| Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors, header signed in or not (photo or initials, cart badge, admin link), protected pages, session expiry |
+| Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors (429, 413 included), header signed in or not, protected pages, session expiry, toasts (queue, durations, roles), lazy routes (titles, focus, stale chunk after a deployment) |
 
-272 tests (243 unit/slice, 29 integration), plus 23 front-end tests. Coverage report: `target/site/jacoco/index.html`.
+273 tests (244 unit/slice, 29 integration), plus 35 front-end tests. Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 
@@ -452,7 +481,8 @@ shared by all Spring contexts.
 | [Release](.github/workflows/release.yml) | Push to `main`, tag `vX.Y.Z` | Tests again, image scanned by Trivy (no fixable CRITICAL vulnerability), then pushed to Docker Hub for amd64 and arm64 with SBOM and provenance |
 | [Dependabot](.github/dependabot.yml) | Weekly | Update pull requests to `dev`: GitHub Actions, Maven, Dockerfile and Compose images |
 
-Image: [`kardigue/ecommerce-api`](https://hub.docker.com/r/kardigue/ecommerce-api), tags `X.Y.Z`, `X.Y`, `latest` (releases),
+Images: [`kardigue/ecommerce-api`](https://hub.docker.com/r/kardigue/ecommerce-api) and
+[`kardigue/ecommerce-web`](https://hub.docker.com/r/kardigue/ecommerce-web) (nginx and the front-end), tags `X.Y.Z`, `X.Y`, `latest` (releases),
 `main` and `sha-<commit>`. Actions are pinned by commit SHA; workflows only read the repository.
 
 To run a published release instead of building locally:

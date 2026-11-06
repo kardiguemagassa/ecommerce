@@ -4,14 +4,15 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import type { ReactNode } from 'react';
+import { Outlet } from 'react-router';
 import { hasRole, signIn, useSession, type Role } from '../api/session';
 import { fr } from '../i18n/fr';
 
 /**
- * Shows its page only to users with the role. Convenience only: the API checks the role on every call, this guard
- * just spares the user a page full of errors.
+ * Layout route around the pages of a role: renders them only for users with the role. Convenience only: the API
+ * checks the role on every call, this guard spares the user a page full of errors.
  */
-export function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
+export function RequireRole({ role }: { role: Role }) {
   const { data: session, isPending } = useSession();
 
   if (isPending) {
@@ -29,13 +30,13 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
   if (!hasRole(session, role)) {
     return <Notice title={fr.access.denied} hint={fr.access.deniedHint} />;
   }
-  return <>{children}</>;
+  return <Outlet />;
 }
 
-function Notice({ title, hint, children }: { title: string; hint: string; children?: ReactNode }) {
+export function Notice({ title, hint, icon, children }: { title: string; hint: string; icon?: ReactNode; children?: ReactNode }) {
   return (
     <Paper variant="outlined" sx={{ p: 4, maxWidth: 520, mx: 'auto', textAlign: 'center', display: 'grid', gap: 1.5, justifyItems: 'center' }}>
-      <LockOutlinedIcon color="primary" fontSize="large" />
+      {icon ?? <LockOutlinedIcon color="primary" fontSize="large" />}
       <Typography variant="h1" component="h1" sx={{ fontSize: '1.5rem' }}>
         {title}
       </Typography>
