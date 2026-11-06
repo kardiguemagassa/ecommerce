@@ -15,3 +15,6 @@ observability/
 frontend/
 # End-to-end tests: run from the host against the stack, never part of an image
 e2e/
+# Keycloak realm and theme (mounted into Keycloak), README screenshots: not part of the API image
+keycloak/
+docs/
