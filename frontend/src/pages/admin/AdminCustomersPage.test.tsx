@@ -37,7 +37,7 @@ describe('Admin: customers and best sellers', () => {
     const drawer = await screen.findByRole('dialog', { name: 'Alice Martin' });
     expect(within(drawer).getByText('alice@example.com')).toBeInTheDocument();
 
-    await user.click(await within(drawer).findByRole('button', { name: 'Commande n° 1042' }));
+    await user.click(await within(drawer).findByRole('button', { name: /^Commande n° 1042 / }));
     expect(await within(drawer).findByRole('rowheader', { name: 'Clavier mécanique TKL' })).toBeInTheDocument();
     expect(within(drawer).getByText('179,80 €')).toBeInTheDocument();
   });

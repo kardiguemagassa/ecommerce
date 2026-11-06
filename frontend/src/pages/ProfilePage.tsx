@@ -6,12 +6,12 @@ import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { visuallyHidden } from '@mui/utils';
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { avatarProblem, useDeleteAvatar, useReplaceAvatar } from '../api/avatar';
-import { IMAGE_TYPES } from '../api/images';
 import { useSession } from '../api/session';
 import { notify } from '../app/notifications';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { FilePickerButton } from '../components/FilePickerButton';
 import { UserAvatar } from '../components/UserAvatar';
 import { fr } from '../i18n/fr';
 
@@ -66,10 +66,7 @@ function AvatarSection({ name, photo }: { name: string; photo?: string }) {
   const remove = useDeleteAvatar();
   const busy = replace.isPending || remove.isPending;
 
-  const pick = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = ''; // the same file can be chosen again after a cancel
-    if (!file) return;
+  const pick = (file: File) => {
     const problem = avatarProblem(file);
     if (problem) notify.error(problem);
     else choose(file);
@@ -101,10 +98,7 @@ function AvatarSection({ name, photo }: { name: string; photo?: string }) {
             </>
           ) : (
             <>
-              <Button component="label" variant="contained" startIcon={<PhotoCameraOutlinedIcon />} disabled={busy}>
-                {fr.profile.change}
-                <Box component="input" type="file" accept={IMAGE_TYPES.join(',')} onChange={pick} sx={visuallyHidden} />
-              </Button>
+              <FilePickerButton label={fr.profile.change} onFile={pick} variant="contained" startIcon={<PhotoCameraOutlinedIcon />} disabled={busy} />
               {photo && (
                 <Button color="error" loading={remove.isPending} disabled={busy} onClick={() => setConfirming(true)}>
                   {fr.profile.delete}

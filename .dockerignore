@@ -13,3 +13,5 @@ http/
 observability/
 # React front-end: built by its own image (nginx), not part of the API image
 frontend/
+# End-to-end tests: run from the host against the stack, never part of an image
+e2e/

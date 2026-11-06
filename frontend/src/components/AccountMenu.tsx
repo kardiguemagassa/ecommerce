@@ -4,6 +4,7 @@ import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import { visuallyHidden } from '@mui/utils';
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router';
 import { hasRole, signOut, type Session } from '../api/session';
@@ -20,7 +21,6 @@ export function AccountMenu({ session }: { session: Session }) {
   return (
     <>
       <Button
-        aria-label={fr.header.accountMenu(name)}
         aria-haspopup="menu"
         aria-expanded={anchor ? 'true' : undefined}
         aria-controls={anchor ? 'account-menu' : undefined}
@@ -31,7 +31,22 @@ export function AccountMenu({ session }: { session: Session }) {
         sx={{ borderRadius: 6, borderColor: 'divider', pl: 0.5, height: 44 }}
       >
         <UserAvatar name={name} photo={session.avatarUrl} />
-        <Box component="span" sx={{ ml: 1, display: { xs: 'none', sm: 'inline' }, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {/*
+          Named by its content, not by aria-label: an aria-label must contain the visible text (WCAG 2.5.3, label in
+          name), which the initials of the avatar would break. Screen readers read the hidden sentence; the visible name
+          is only for the eyes.
+        */}
+        <Box component="span" sx={visuallyHidden}>
+          {fr.header.accountMenu(name)}
+        </Box>
+        <Box
+          component="span"
+          aria-hidden
+          sx={(theme) => ({
+            ml: 1, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            [theme.breakpoints.down('sm')]: { display: 'none' }, // phones: the photo alone
+          })}
+        >
           {name}
         </Box>
       </Button>

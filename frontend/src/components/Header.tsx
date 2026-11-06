@@ -51,7 +51,8 @@ export function Header() {
         <Box component="nav" aria-label="Compte" sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: { xs: 'auto', md: 0 } }}>
           {isCustomer && (
             <IconButton component={RouterLink} to="/panier" aria-label={fr.header.cart(count)} color="inherit" sx={{ width: 44, height: 44 }}>
-              <Badge badgeContent={count} color="secondary">
+              {/* No content at 0: a hidden "0" would still count as visible text of the link (WCAG 2.5.3, label in name). */}
+              <Badge badgeContent={count > 0 ? count : undefined} max={999} color="secondary">
                 <ShoppingCartOutlinedIcon />
               </Badge>
             </IconButton>

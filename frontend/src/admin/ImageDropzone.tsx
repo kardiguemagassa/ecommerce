@@ -2,13 +2,13 @@ import PhotoOutlinedIcon from '@mui/icons-material/AddPhotoAlternateOutlined';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
-import { visuallyHidden } from '@mui/utils';
-import { useState, type ChangeEvent, type DragEvent } from 'react';
+import { useState, type DragEvent } from 'react';
 import { useDeleteProductImage, useReplaceProductImage } from '../api/admin';
 import type { Product } from '../api/catalog';
-import { IMAGE_TYPES, PRODUCT_IMAGE_MAX_BYTES, imageProblem } from '../api/images';
+import { PRODUCT_IMAGE_MAX_BYTES, imageProblem } from '../api/images';
 import { notify } from '../app/notifications';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { FilePickerButton } from '../components/FilePickerButton';
 import { fr } from '../i18n/fr';
 import { ProductImage } from '../product/ProductImage';
 
@@ -28,10 +28,6 @@ export function ImageDropzone({ product }: { product: Product }) {
     const problem = imageProblem(file, PRODUCT_IMAGE_MAX_BYTES);
     if (problem) notify.error(problem);
     else replace.mutate({ id: product.id!, file });
-  };
-  const pick = (event: ChangeEvent<HTMLInputElement>) => {
-    send(event.target.files?.[0]);
-    event.target.value = ''; // the same file can be chosen again
   };
   const drop = (event: DragEvent) => {
     event.preventDefault();
@@ -67,10 +63,7 @@ export function ImageDropzone({ product }: { product: Product }) {
             {fr.admin.image.hint}
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Button component="label" size="small" variant="outlined" loading={replace.isPending} disabled={busy}>
-              {fr.admin.image.choose}
-              <Box component="input" type="file" accept={IMAGE_TYPES.join(',')} onChange={pick} sx={visuallyHidden} />
-            </Button>
+            <FilePickerButton label={fr.admin.image.choose} onFile={send} size="small" variant="outlined" loading={replace.isPending} disabled={busy} />
             {product.imageUrl && (
               <Button size="small" color="error" loading={remove.isPending} disabled={busy} onClick={() => setConfirming(true)}>
                 {fr.admin.image.remove}

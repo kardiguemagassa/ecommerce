@@ -66,9 +66,9 @@ function CustomerDetail({ id, onClose }: { id: number; onClose: () => void }) {
           <Box>
             {orders.content.map((order) => (
               <Accordion key={order.id} disableGutters variant="outlined" slotProps={{ transition: { unmountOnExit: true } }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-label={fr.admin.customers.orderLabel(order.id!)}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5, width: '100%', pr: 1 }}>
-                    <Typography sx={{ fontWeight: 600 }}>n° {order.id}</Typography>
+                    <Typography sx={{ fontWeight: 600 }}>{fr.admin.customers.orderLabel(order.id!)}</Typography>
                     <Typography color="text.secondary">{formatDate(order.createdAt)}</Typography>
                     <OrderStatusChip status={order.status ?? 'PENDING'} />
                     <Typography sx={{ ml: 'auto', fontWeight: 600 }}>{formatPrice(order.totalAmount)}</Typography>

@@ -1,0 +1,5 @@
+node_modules/
+# Signed-in browser sessions (cookies of the demo accounts), written by the setup project
+.auth/
+test-results/
+playwright-report/
