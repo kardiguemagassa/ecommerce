@@ -115,8 +115,9 @@ class MediaStorageIT {
         assertThat(image.headers().firstValue("Content-Type")).hasValue("image/jpeg");
         assertThat(image.headers().firstValue("Cache-Control")).hasValueSatisfying(value -> assertThat(value).contains("immutable"));
         BufferedImage stored = ImageIO.read(new ByteArrayInputStream(image.body()));
+        // 16:9 upload: reduced to the width of its use, nothing cut.
         assertThat(stored.getWidth()).isEqualTo(1200);
-        assertThat(stored.getHeight()).isEqualTo(900);
+        assertThat(stored.getHeight()).isEqualTo(675);
     }
 
     @Test

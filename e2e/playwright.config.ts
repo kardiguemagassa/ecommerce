@@ -8,6 +8,8 @@ import { BASE_URL } from './support/env';
  */
 export default defineConfig({
   testDir: './tests',
+  // The data the tests created leaves the database at the end (scripts/clean-test-data.sh).
+  globalTeardown: './support/teardown.ts',
   // One worker: the tests share the demo accounts (alice's cart, her orders).
   workers: 1,
   fullyParallel: false,
