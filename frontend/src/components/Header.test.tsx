@@ -53,7 +53,7 @@ describe('Header', () => {
     const user = userEvent.setup();
     const { router } = renderApp('/panier');
 
-    await user.type(screen.getByRole('searchbox', { name: 'Rechercher un produit' }), 'clavier{Enter}');
+    await user.type(await screen.findByRole('searchbox', { name: 'Rechercher un produit' }), 'clavier{Enter}');
 
     expect(router.state.location.pathname).toBe('/');
     expect(router.state.location.search).toBe('?q=clavier');

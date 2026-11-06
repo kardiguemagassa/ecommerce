@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # Smoke test of the running Compose stack (docker compose --profile app up -d --wait), run by CI and by hand:
-# real Keycloak tokens against the API, then the observability pipeline end to end.
+# everything through the web entry point (nginx on http://localhost:8080), as a browser would, with real Keycloak
+# tokens, then the observability pipeline end to end.
 #   1. Keycloak serves the "ecommerce" realm; the API refuses anonymous (401) and under-privileged (403) calls
 #   2. the shop administrator creates a product, the customer alice@example.com orders it through /api/me
-#   3. the browser login of the BFF: Keycloak login form, session cookie, CSRF on writes, logout at Keycloak
-#   4. images: product image and avatar uploaded, re-encoded as JPEG, served by the media storage, deleted
-#   5. an error response carries the id of its trace
-#   6. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
-#   7. the confirmation log lines of that trace reach Loki
+#   3. the browser login of the BFF: Keycloak login form, back on the front-end, session cookie, CSRF on writes,
+#      logout at Keycloak
+#   4. images: product image and avatar uploaded, re-encoded as JPEG, served read-only under /media, deleted
+#   5. the web entry point: front-end routes, security headers
+#   6. an error response carries the id of its trace
+#   7. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
+#   8. the confirmation log lines of that trace reach Loki
+#   9. image uploads are rate limited (429): last, not to slow the other checks down
 # Tokens of the demo users come from scripts/dev-token.sh (password grant on a development-only client).
 # Grafana's data source proxy is used for Tempo and Loki (admin/admin, development backend only).
 set -euo pipefail
@@ -20,7 +24,8 @@ setting() {
   printf '%s' "$value"
 }
 
-API=${API_URL:-http://localhost:8080/api}
+BASE=${BASE_URL:-http://localhost:8080}
+API=$BASE/api
 GRAFANA=${GRAFANA_URL:-http://admin:admin@localhost:3000}/api/datasources/proxy/uid
 KEYCLOAK=${KEYCLOAK_URL:-http://localhost:${KEYCLOAK_PORT:-8180}}
 ATTEMPTS=${ATTEMPTS:-30}
@@ -80,7 +85,6 @@ order=$(body "$response" | json "['id']")
 echo "OK  customer profile from the token, order $order placed through /api/me"
 
 # --- Browser login through the API (BFF), as a browser would do it ----------------------------------------------
-BASE=${API%/api}
 jar=$(mktemp)
 image=$(mktemp)
 trap 'rm -f "$jar" "$image"' EXIT
@@ -89,13 +93,16 @@ form_action() { python3 -c "import html, re, sys; m = re.search(r'action=\"([^\"
 
 action=$(browser -L "$BASE/oauth2/authorization/keycloak" | form_action)
 [ -n "$action" ] || fail "BFF login: no Keycloak login form"
-session=$(browser -L --data-urlencode "username=$CUSTOMER" --data-urlencode "password=$(setting DEMO_USER_PASSWORD)" "$action")
+landing=$(browser -L -o /dev/null -w '%{url_effective}' --data-urlencode "username=$CUSTOMER" \
+  --data-urlencode "password=$(setting DEMO_USER_PASSWORD)" "$action")
+[ "$landing" = "$BASE/" ] || fail "BFF login: landed on $landing instead of the front-end $BASE/"
+session=$(browser "$API/me/session")
 [ "$(json "['authenticated']" <<< "$session")" = True ] || fail "BFF login: not signed in after the login form: $session"
 [ "$(json "['email']" <<< "$session")" = "$CUSTOMER" ] || fail "BFF login: session of another user: $session"
 grep -q 'JSESSIONID' "$jar" || fail "BFF login: no session cookie"
 xsrf=$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$jar" | tail -1)
 [ -n "$xsrf" ] || fail "BFF login: no XSRF-TOKEN cookie"
-echo "OK  BFF login of $CUSTOMER: Keycloak form, session cookie, no token in the browser"
+echo "OK  BFF login of $CUSTOMER: Keycloak form, back on the front-end, session cookie, no token in the browser"
 
 item="{\"productId\":$product,\"quantity\":1}"
 code=$(browser -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$item" "$API/me/cart/items")
@@ -131,9 +138,12 @@ response=$(upload "/products/$product/image" "$ADMIN" "$image")
 expect "$response" 200 "product image uploaded by the administrator"
 image_url=$(body "$response" | json "['imageUrl']")
 [ "$(curl -fsS "$API/products/$product" | json "['imageUrl']")" = "$image_url" ] || fail "product read without its new image"
-content_type=$(curl -fsS -o /dev/null -w '%{content_type}' "$image_url") || fail "product image not served at $image_url"
+case "$image_url" in /media/products/*.jpg) ;; *) fail "product image URL $image_url is not under /media" ;; esac
+content_type=$(curl -fsS -o /dev/null -w '%{content_type}' "$BASE$image_url") || fail "product image not served at $image_url"
 [ "$content_type" = image/jpeg ] || fail "product image served as $content_type instead of image/jpeg"
-echo "OK  product image stored and re-encoded as JPEG, public at $image_url"
+code=$(curl -sS -o /dev/null -w '%{http_code}' -X PUT --data 'overwritten' "$BASE$image_url")
+case "$code" in 2*) fail "media writable without credentials: PUT $image_url answered $code" ;; esac
+echo "OK  product image stored and re-encoded as JPEG, served read-only at $image_url"
 
 echo 'not an image' > "$image.txt"
 response=$(upload /me/avatar "$ALICE" "$image.txt"); rm -f "$image.txt"
@@ -141,12 +151,20 @@ expect "$response" 415 "text file sent as avatar"
 response=$(upload /me/avatar "$ALICE" "$image")
 expect "$response" 200 "avatar uploaded"
 avatar_url=$(body "$response" | json "['avatarUrl']")
-curl -fsS -o /dev/null "$avatar_url" || fail "avatar not served at $avatar_url"
+curl -fsS -o /dev/null "$BASE$avatar_url" || fail "avatar not served at $avatar_url"
 expect "$(call DELETE /me/avatar "$ALICE")" 204 "avatar deleted"
-code=$(curl -sS -o /dev/null -w '%{http_code}' "$avatar_url")
+code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE$avatar_url")
 [ "$code" != 200 ] || fail "deleted avatar still served at $avatar_url"
 [ "$(body "$(call GET /me "$ALICE")" | json "['avatarUrl']")" = None ] || fail "profile still has an avatar"
 echo "OK  avatar: other files refused (415), stored, then erased from the storage"
+
+# --- Web entry point: front-end routes and security headers -------------------------------------------------------
+headers=$(curl -fsS -D - -o /dev/null "$BASE/admin") || fail "front-end route /admin not served"
+grep -qi '^content-type: text/html' <<< "$headers" || fail "/admin is not the front-end page"
+grep -qi "^content-security-policy: default-src 'self'; script-src 'self'" <<< "$headers" || fail "front-end without its CSP"
+grep -qi '^x-content-type-options: nosniff' <<< "$headers" || fail "front-end without X-Content-Type-Options"
+grep -qi '^server: nginx/' <<< "$headers" && fail "nginx version disclosed"
+echo "OK  front-end routes served by nginx with CSP and security headers"
 
 # --- Observability -------------------------------------------------------------------------------------------------
 error_trace=$(body "$(call GET /categories/999999999 none)" | json ".get('traceId', '')")
@@ -188,3 +206,14 @@ for stream in json.load(sys.stdin)['data']['result']:
 done
 echo "$logs" | grep -q "Confirmation of order $order sent" || fail "no confirmation log of order $order in Loki"
 echo "OK  confirmation logs of order $order in Loki, same trace id"
+
+# --- Rate limit of image uploads (last: the window then stays full for a minute) --------------------------------
+echo 'not an image' > "$image"
+limited=""
+for _ in $(seq 1 15); do
+  response=$(upload /me/avatar "$ALICE" "$image")
+  if [ "$(status "$response")" = 429 ]; then limited=$(body "$response"); break; fi
+done
+[ -n "$limited" ] || fail "15 avatar uploads in a row were not rate limited"
+[ "$(json "['code']" <<< "$limited")" = RATE_LIMITED ] || fail "rate limit answer is not a RATE_LIMITED problem: $limited"
+echo "OK  image uploads rate limited by nginx (429 RATE_LIMITED)"

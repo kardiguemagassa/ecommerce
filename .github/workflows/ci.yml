@@ -104,7 +104,8 @@ jobs:
           done
       - name: Start the stack
         run: docker compose --profile app up -d --build --wait --wait-timeout 300
-      # An order placed through the API, images uploaded, the order trace read back from Tempo and its logs from Loki.
+      # Everything through nginx: an order, the browser login, images, security headers, the order trace in Tempo and
+      # its logs in Loki, then the upload rate limit.
       - name: Smoke test
         run: ./scripts/smoke.sh
       - name: Container logs

@@ -38,6 +38,7 @@ const byCode: Record<string, string> = {
   UNSUPPORTED_IMAGE: fr.errors.unsupportedImage,
   INVALID_IMAGE: fr.errors.invalidImage,
   STORAGE_UNAVAILABLE: fr.errors.storageUnavailable,
+  RATE_LIMITED: fr.errors.rateLimited,
 };
 
 // The API words its titles in English; the interface never shows them as they are.
@@ -55,6 +56,8 @@ export function messageOf(status: number, problem: Problem): string {
   if (status === 403) return fr.errors.accessDenied;
   if (status === 404) return fr.errors.notFound;
   if (status === 400) return fr.errors.invalid;
+  if (status === 413) return fr.errors.imageTooLarge;
+  if (status === 429) return fr.errors.rateLimited;
   if (status === 409) return conflictByTitle[problem.title ?? ''] ?? fr.errors.conflict;
   if (status === 0 || status >= 500) return fr.errors.unavailable;
   return fr.errors.unexpected;

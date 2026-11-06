@@ -6,6 +6,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
@@ -31,19 +32,31 @@ final class KeycloakLogoutSuccessHandler implements LogoutSuccessHandler {
         response.setStatus(HttpServletResponse.SC_OK);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write("{\"logoutUrl\":\"" + logoutUrl(authentication) + "\"}");
+        response.getWriter().write("{\"logoutUrl\":\"" + logoutUrl(request, authentication) + "\"}");
     }
 
     /** Keycloak end-session URL with the ID token as hint; the front-end URL when no OIDC session was open. */
-    String logoutUrl(Authentication authentication) {
+    String logoutUrl(HttpServletRequest request, Authentication authentication) {
+        String frontUrl = frontUrl(request);
         if (authentication == null || !(authentication.getPrincipal() instanceof OidcUser user)) {
-            return bff.frontUrl().toString();
+            return frontUrl;
         }
         return UriComponentsBuilder.fromUri(bff.endSessionUri())
                 .queryParam("id_token_hint", user.getIdToken().getTokenValue())
-                .queryParam("post_logout_redirect_uri", bff.frontUrl())
+                .queryParam("post_logout_redirect_uri", frontUrl)
                 .encode()
                 .build()
                 .toUriString();
+    }
+
+    /**
+     * Keycloak only accepts an absolute, registered post-logout URI: a relative front-end URL is resolved against the
+     * address the browser used (behind nginx: its forwarded headers, see server.forward-headers-strategy).
+     */
+    private String frontUrl(HttpServletRequest request) {
+        if (bff.frontUrl().isAbsolute()) {
+            return bff.frontUrl().toString();
+        }
+        return ServletUriComponentsBuilder.fromContextPath(request).path(bff.frontUrl().getPath()).build().toUriString();
     }
 }

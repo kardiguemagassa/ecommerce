@@ -1,7 +1,7 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/problem';
 import { sessionKey } from '../api/session';
-import { notifyError } from './notifications';
+import { notify } from './notifications';
 
 /**
  * Server state (TanStack Query): cached, refreshed when the window gets focus again, retried once on network errors.
@@ -22,7 +22,7 @@ export function createQueryClient(): QueryClient {
 }
 
 function onError(client: QueryClient, error: Error) {
-  notifyError(error);
+  notify.error(error);
   if (error instanceof ApiError && error.status === 401) {
     void client.invalidateQueries({ queryKey: sessionKey });
   }

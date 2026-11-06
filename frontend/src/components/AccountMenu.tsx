@@ -7,7 +7,7 @@ import MenuItem from '@mui/material/MenuItem';
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router';
 import { hasRole, signOut, type Session } from '../api/session';
-import { notifyError } from '../app/notifications';
+import { notify } from '../app/notifications';
 import { fr } from '../i18n/fr';
 import { UserAvatar } from './UserAvatar';
 
@@ -51,7 +51,7 @@ export function AccountMenu({ session }: { session: Session }) {
         <MenuItem
           onClick={() => {
             close();
-            signOut().catch(notifyError);
+            signOut().catch(notify.error);
           }}
           sx={{ color: 'error.main' }}
         >
