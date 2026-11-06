@@ -254,6 +254,7 @@ silently skipping V1.
 | `POST` | `/api/me/orders` | Place an order from my cart |
 | `GET` | `/api/me/orders` | My order history (paginated, newest first) |
 | `GET` | `/api/me/orders/{orderId}` | One of my orders with its lines |
+| `GET` | `/api/admin/customers?q=` | Customer support: search by name or e-mail (paginated, by name) |
 | `GET` | `/api/admin/customers/{id}[/orders[/{orderId}]]` | Customer support: a customer, their orders |
 
 ### Security
@@ -448,7 +449,7 @@ http://localhost:3000 (admin / admin):
 - **Explore → Loki**: `{service_name="ecommerce"} | trace_id="<traceId>"` for the logs of one request
 
 `./scripts/smoke.sh` does all of this automatically against the running stack (also run by CI): it places an order,
-changes a cart quantity through the browser session (and is refused above the stock), uploads a product image and a profile photo (read back from the media storage, then deleted), then checks the
+changes a cart quantity through the browser session (and is refused above the stock), finds the customer and their order as the administrator, uploads a product image and a profile photo (read back from the media storage, then deleted), then checks the
 `traceId` of an error, the order trace in Tempo and its confirmation logs in Loki.
 
 ## Tests
@@ -472,9 +473,9 @@ shared by all Spring contexts.
 | Security | `@WebMvcTest` with `@WithMockUser` / `oidcLogin()`, JUnit | 401 / 403 per route, CSRF on session writes, session endpoint, logout URL, roles of the ID token, first-call provisioning |
 | Images | JUnit, Mockito | Format detection, decompression bombs, EXIF orientation and removal, crop and size, storage kept in step with commits and rollbacks |
 | Integration (`*IT`) | `@SpringBootTest`, Testcontainers SeaweedFS | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch, images served publicly and deleted |
-| Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors (429, 413 included), header signed in or not, protected pages, session expiry, toasts (queue, durations, roles, actions), lazy routes (titles, focus, stale chunk after a deployment), catalogue (URL state sent to the API, filters, pagination links, empty results, best sellers), product page (quantity bounds, 404), add to cart (badge, toasts, anonymous visitor, click before the session is known, insufficient stock), cart (optimistic quantity rolled back on a 409, remove and undo, clear after confirmation, empty cart, anonymous visitor without call), order (placed then tracked, polling stopped once confirmed, 404 in the page), order history (page from the address), profile photo (checked before upload, preview, multipart upload, header updated, deletion confirmed), account console link |
+| Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors (429, 413 included), header signed in or not, protected pages, session expiry, toasts (queue, durations, roles, actions), lazy routes (titles, focus, stale chunk after a deployment), catalogue (URL state sent to the API, filters, pagination links, empty results, best sellers), product page (quantity bounds, 404), add to cart (badge, toasts, anonymous visitor, click before the session is known, insufficient stock), cart (optimistic quantity rolled back on a 409, remove and undo, clear after confirmation, empty cart, anonymous visitor without call), order (placed then tracked, polling stopped once confirmed, 404 in the page), order history (page from the address), profile photo (checked before upload, preview, multipart upload, header updated, deletion confirmed), account console link, admin space (sections as links, product form validated in French, creation then image, unsaved changes kept, image checked before upload, deletion refused for an ordered product, categories renamed with the keyboard, best sellers, customer search and orders) |
 
-284 tests (255 unit/slice, 29 integration), plus 74 front-end tests. Coverage report: `target/site/jacoco/index.html`.
+290 tests (261 unit/slice, 29 integration), plus 90 front-end tests. Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 

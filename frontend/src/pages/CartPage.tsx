@@ -109,7 +109,7 @@ function CartLineView({ item }: { item: CartItem }) {
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '72px 1fr auto', sm: '96px 1fr auto auto' }, gap: { xs: 1.5, sm: 2.5 }, alignItems: 'center', p: { xs: 2, sm: 2.5 } }}>
       <Box sx={{ borderRadius: 3, overflow: 'hidden', gridRow: { xs: 'span 2', sm: 'auto' } }}>
-        <ProductImage product={{ id: productId, name, imageUrl: item.imageUrl }} />
+        <ProductImage product={{ id: productId, name, imageUrl: item.imageUrl }} decorative />
       </Box>
       <Box sx={{ minWidth: 0 }}>
         <Link component={RouterLink} to={`/produits/${productId}`} underline="hover" color="text.primary" sx={{ fontWeight: 600 }}>

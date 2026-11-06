@@ -13,8 +13,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +45,20 @@ class CustomerServiceTest {
 
     @InjectMocks
     private CustomerService customerService;
+
+    @Test
+    void search_stripsTheTerm_andSearchesEveryoneWithoutOne() {
+        Pageable page = PageRequest.of(0, 20);
+        Customer alice = new Customer(SUBJECT, "alice@example.com", "Alice Martin");
+        when(customerRepository.search("martin", page)).thenReturn(new PageImpl<>(List.of(alice), page, 1));
+        when(customerRepository.search("", page)).thenReturn(new PageImpl<>(List.of(alice), page, 1));
+
+        assertThat(customerService.search("  martin ", page).getContent())
+                .singleElement()
+                .extracting(CustomerResponse::email)
+                .isEqualTo("alice@example.com");
+        assertThat(customerService.search(null, page).getTotalElements()).isEqualTo(1);
+    }
 
     private void saveReturnsItsArgument() {
         when(customerRepository.saveAndFlush(any(Customer.class))).thenAnswer(invocation -> invocation.getArgument(0));

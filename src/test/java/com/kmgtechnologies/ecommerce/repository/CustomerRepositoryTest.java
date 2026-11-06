@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,6 +52,22 @@ class CustomerRepositoryTest {
 
         assertThatThrownBy(() -> customerRepository.saveAndFlush(new Customer("sub-alice", "other@example.com", "Other")))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void search_matchesTheNameOrTheEmail_ignoringCase_sortedAndPaged() {
+        customerRepository.saveAndFlush(new Customer("sub-alice", "alice@example.com", "Alice Martin"));
+        customerRepository.saveAndFlush(new Customer("sub-bob", "bob@example.com", "Bob Durand"));
+        customerRepository.saveAndFlush(new Customer("sub-carla", "carla@martin.fr", "Carla Petit"));
+        PageRequest byName = PageRequest.of(0, 10, Sort.by("fullName"));
+
+        assertThat(customerRepository.search("MARTIN", byName).map(Customer::getFullName))
+                .containsExactly("Alice Martin", "Carla Petit"); // name of one, e-mail of the other
+        assertThat(customerRepository.search("bob@", byName).map(Customer::getFullName)).containsExactly("Bob Durand");
+        assertThat(customerRepository.search("", PageRequest.of(1, 2, Sort.by("fullName"))))
+                .extracting(Customer::getFullName)
+                .containsExactly("Carla Petit");
+        assertThat(customerRepository.search("", byName).getTotalElements()).isEqualTo(3);
     }
 
     @Test

@@ -1,10 +1,11 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { data, type LoaderFunctionArgs, type RouteObject } from 'react-router';
+import { data, Navigate, type LoaderFunctionArgs, type RouteObject } from 'react-router';
+import { BEST_SELLERS_LIMIT, adminProductsQuery, adminSearchFrom, customersQuery } from '../api/admin';
 import { cartQuery } from '../api/cart';
 import { bestSellersQuery, categoriesQuery, productListQuery, productQuery, type Product } from '../api/catalog';
 import { orderPageFrom, orderQuery, ordersQuery, type Order } from '../api/orders';
 import { ApiError } from '../api/problem';
-import { hasRole, sessionQuery } from '../api/session';
+import { hasRole, sessionQuery, type Role } from '../api/session';
 import { filtersFrom } from '../catalog/filters';
 import { Layout, type RouteHandle } from '../components/Layout';
 import { PageFallback } from '../components/PageFallback';
@@ -39,15 +40,42 @@ async function orNotFound<T>(load: Promise<T>, kind: NotFound['kind']): Promise<
 }
 
 /**
- * Loader of a customer page: fetches its data only for a signed-in customer. Otherwise it returns nothing and the
- * route guard asks to sign in, without a failed call nor an error toast.
+ * Loader of a guarded page: fetches its data only when the session has the role. Otherwise it returns nothing and the
+ * route guard asks to sign in (or says the space is reserved), without a failed call nor an error toast.
  */
-const forCustomer =
-  <T,>(queryClient: QueryClient, load: (args: LoaderFunctionArgs) => Promise<T>) =>
+const forRole =
+  <T,>(role: Role, queryClient: QueryClient, load: (args: LoaderFunctionArgs) => Promise<T>) =>
   async (args: LoaderFunctionArgs): Promise<T | null> => {
     const session = await queryClient.ensureQueryData(sessionQuery());
-    return hasRole(session, 'CUSTOMER') ? load(args) : null;
+    return hasRole(session, role) ? load(args) : null;
   };
+
+const forCustomer = <T,>(queryClient: QueryClient, load: (args: LoaderFunctionArgs) => Promise<T>) =>
+  forRole('CUSTOMER', queryClient, load);
+
+const forAdmin = <T,>(queryClient: QueryClient, load: (args: LoaderFunctionArgs) => Promise<T>) =>
+  forRole('ADMIN', queryClient, load);
+
+const searchOf = (request: Request) => adminSearchFrom(new URL(request.url).searchParams);
+
+/** Admin products: the page of the table, and the categories the form offers. */
+const adminProductsLoader = (queryClient: QueryClient) =>
+  forAdmin(queryClient, async ({ request }) => {
+    await Promise.all([
+      queryClient.ensureQueryData({ ...adminProductsQuery(searchOf(request)), revalidateIfStale: true }),
+      queryClient.ensureQueryData({ ...categoriesQuery(), revalidateIfStale: true }),
+    ]);
+    return null;
+  });
+
+const adminCategoriesLoader = (queryClient: QueryClient) =>
+  forAdmin(queryClient, () => queryClient.ensureQueryData({ ...categoriesQuery(), revalidateIfStale: true }));
+
+const adminBestSellersLoader = (queryClient: QueryClient) =>
+  forAdmin(queryClient, () => queryClient.ensureQueryData({ ...bestSellersQuery(BEST_SELLERS_LIMIT), revalidateIfStale: true }));
+
+const adminCustomersLoader = (queryClient: QueryClient) =>
+  forAdmin(queryClient, ({ request }) => queryClient.ensureQueryData({ ...customersQuery(searchOf(request)), revalidateIfStale: true }));
 
 /**
  * Catalogue: the page of products and the categories are fetched while the page module loads (render as you fetch),
@@ -147,9 +175,37 @@ export const createRoutes = (queryClient: QueryClient): RouteObject[] => [
             element: <RequireRole role="ADMIN" />,
             children: [
               {
-                path: 'admin/*',
+                path: 'admin',
                 handle: titled(fr.pages.admin),
-                lazy: () => import('../pages/AdminPage').then((module) => ({ Component: module.AdminPage })),
+                lazy: () => import('../pages/admin/AdminLayout').then((module) => ({ Component: module.AdminLayout })),
+                children: [
+                  // The admin space opens on the products (replace: the back button does not land on /admin again).
+                  { index: true, element: <Navigate to="/admin/produits" replace /> },
+                  {
+                    path: 'produits',
+                    handle: titled(fr.admin.titles.products),
+                    loader: adminProductsLoader(queryClient),
+                    lazy: () => import('../pages/admin/AdminProductsPage').then((module) => ({ Component: module.AdminProductsPage })),
+                  },
+                  {
+                    path: 'categories',
+                    handle: titled(fr.admin.titles.categories),
+                    loader: adminCategoriesLoader(queryClient),
+                    lazy: () => import('../pages/admin/AdminCategoriesPage').then((module) => ({ Component: module.AdminCategoriesPage })),
+                  },
+                  {
+                    path: 'ventes',
+                    handle: titled(fr.admin.titles.bestSellers),
+                    loader: adminBestSellersLoader(queryClient),
+                    lazy: () => import('../pages/admin/AdminBestSellersPage').then((module) => ({ Component: module.AdminBestSellersPage })),
+                  },
+                  {
+                    path: 'clients',
+                    handle: titled(fr.admin.titles.customers),
+                    loader: adminCustomersLoader(queryClient),
+                    lazy: () => import('../pages/admin/AdminCustomersPage').then((module) => ({ Component: module.AdminCustomersPage })),
+                  },
+                ],
               },
             ],
           },

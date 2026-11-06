@@ -7,6 +7,8 @@ import com.kmgtechnologies.ecommerce.media.ImageKind;
 import com.kmgtechnologies.ecommerce.media.MediaFiles;
 import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CustomerRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,6 +30,13 @@ public class CustomerService {
         this.customerRepository = customerRepository;
         this.mediaFiles = mediaFiles;
         this.mediaUrls = mediaUrls;
+    }
+
+    /** Customer support: customers whose name or e-mail contains the term; all of them without one. */
+    public Page<CustomerResponse> search(String term, Pageable pageable) {
+        String normalizedTerm = term == null ? "" : term.strip();
+        return customerRepository.search(normalizedTerm, pageable)
+                .map(customer -> CustomerResponse.from(customer, mediaUrls));
     }
 
     public CustomerResponse findById(Long id) {
