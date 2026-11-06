@@ -42,3 +42,6 @@ build/
 
 ### IntelliJ HTTP client secrets ###
 http/http-client.private.env.json
+
+# Python bytecode (scripts/)
+__pycache__/
