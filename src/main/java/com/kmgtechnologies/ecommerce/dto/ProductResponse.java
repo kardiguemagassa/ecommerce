@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 /**
  * A product of the catalog.
  *
- * @param imageUrl public URL of the product image (JPEG, 4:3), null without image
+ * @param imageUrl public URL of the product image (JPEG within 1200 x 900, proportions kept), null without image
  */
 public record ProductResponse(
         Long id,

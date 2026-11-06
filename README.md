@@ -353,9 +353,10 @@ Product images (administrators) and profile photos (each customer, optional) are
 
 - **Untrusted input**: the format comes from the content (magic bytes), never from the file name or the declared type;
   the dimensions are read before decoding (decompression bombs refused above 40 megapixels).
-- **Re-encoded**: turned upright (EXIF orientation), centre-cropped (4:3 for products, square for photos), reduced to
-  1200 x 900 or 256 x 256 at most, flattened on white, written as a new JPEG: no EXIF (GPS position, device), no
-  payload appended to the original survives.
+- **Re-encoded**: turned upright (EXIF orientation), reduced (never enlarged) and flattened on white, written as a new
+  JPEG: no EXIF (GPS position, device), no payload appended to the original survives. A product image keeps its whole
+  picture within 1200 x 900 (the shop fits it in a 4:3 box, on white: a portrait product is never cut); a profile
+  photo is centre-cropped to a 256 x 256 square, shown in a circle.
 - **Random keys** (`products/<uuid>.jpg`): names chosen by users never reach the storage, URLs cannot be guessed,
   objects never change (served with `Cache-Control: immutable`).
 - **Consistent with the database**: a new image is written first and deleted if the transaction rolls back; the
@@ -480,7 +481,8 @@ http://localhost:3000 (admin / admin):
 
 `./scripts/smoke.sh` does all of this automatically against the running stack (also run by CI): it places an order,
 changes a cart quantity through the browser session (and is refused above the stock), finds the customer and their order as the administrator, uploads a product image and a profile photo (read back from the media storage, then deleted), then checks the
-`traceId` of an error, the order trace in Tempo and its confirmation logs in Loki.
+`traceId` of an error, the order trace in Tempo and its confirmation logs in Loki. It ends by removing what it created
+(`./scripts/clean-test-data.sh`, below).
 
 ## Tests
 
@@ -501,7 +503,7 @@ shared by all Spring contexts.
 | Controllers | `@WebMvcTest` | Validation, status codes, RFC 9457 payloads |
 | Observability | JUnit, OpenTelemetry SDK (in-memory) | Noise filter, logs exported with their trace id, `traceId` in errors |
 | Security | `@WebMvcTest` with `@WithMockUser` / `oidcLogin()`, JUnit | 401 / 403 per route, CSRF on session writes, session endpoint, logout URL, roles of the ID token, first-call provisioning |
-| Images | JUnit, Mockito | Format detection, decompression bombs, EXIF orientation and removal, crop and size, storage kept in step with commits and rollbacks |
+| Images | JUnit, Mockito | Format detection, decompression bombs, EXIF orientation and removal, size (whole product picture, square photo), storage kept in step with commits and rollbacks |
 | Integration (`*IT`) | `@SpringBootTest`, Testcontainers SeaweedFS | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch, images served publicly and deleted |
 | Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors (429, 413 included), header signed in or not, protected pages, session expiry, toasts (queue, durations, roles, actions), lazy routes (titles, focus, stale chunk after a deployment), catalogue (URL state sent to the API, filters, pagination links, empty results, best sellers), product page (quantity bounds, 404), add to cart (badge, toasts, anonymous visitor, click before the session is known, insufficient stock), cart (optimistic quantity rolled back on a 409, remove and undo, clear after confirmation, empty cart, anonymous visitor without call), order (placed then tracked, polling stopped once confirmed, 404 in the page), order history (page from the address), profile photo (checked before upload, preview, multipart upload, header updated, deletion confirmed), account console link, admin space (sections as links, product form validated in French, creation then image, unsaved changes kept, image checked before upload, deletion refused for an ordered product, categories renamed with the keyboard, best sellers, customer search and orders) |
 
@@ -528,9 +530,14 @@ npm run e2e:report # the HTML report, with the trace of each failed test
 | Security | Admin space refused to a customer, security headers, no token in the page's storage, and every test fails on a CSP violation or a script error |
 | Accessibility | axe (WCAG 2.1 A and AA) on every page, dialogs and side panels included: no violation of impact *serious* or *critical* |
 
-Each run creates its own data through the API (names `E2E … <run>`), so runs never collide; on a development
-database they stay (an ordered product cannot be deleted). CI runs them on a fresh stack in the `e2e` job, the HTML
-report and traces kept 7 days as an artifact when a test fails.
+Each run creates its own data through the API (names `E2E … <run>`), so runs never collide. CI runs them on a fresh
+stack in the `e2e` job, the HTML report and traces kept 7 days as an artifact when a test fails.
+
+**Test data.** At the end of a run, the end-to-end tests and `scripts/smoke.sh` call `./scripts/clean-test-data.sh`:
+the categories named `E2E …`, `Smoke …` (and `OTel …`, from earlier smoke tests) leave the database with their
+products, cart lines and orders, so a development catalogue keeps only its own data. An ordered product cannot be
+deleted through the API, hence SQL, in one transaction refused as a whole if an order mixes test and real products.
+`KEEP_TEST_DATA=1` keeps the data to look at it after a run; the script can also be run by hand.
 
 ## Known limitations and next steps
 
@@ -566,5 +573,5 @@ IMAGE_NAMESPACE=kardigue IMAGE_TAG=1.1.0 docker compose --profile app up -d --no
 
 ## Workflow
 
-- Feature branches merged into `dev` through pull requests; `main` and `dev` are protected, CI `build`, `frontend` and `smoke` required
+- Feature branches merged into `dev` through pull requests; `main` and `dev` are protected, CI `build`, `frontend`, `smoke` and `e2e` required
 - [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `test`, `build`, `docs`, `chore`)
