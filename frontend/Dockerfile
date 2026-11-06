@@ -11,7 +11,7 @@ COPY . .
 RUN npm run build
 
 # Unprivileged nginx: runs as user nginx (uid 101) on port 8080, no root process at all.
-FROM nginx/nginx-unprivileged:1.30.6-alpine-slim
+FROM nginx/nginx-unprivileged:1.31.8-alpine-slim
 ENV API_UPSTREAM=api:8080 \
     MEDIA_UPSTREAM=media:8333 \
     MEDIA_BUCKET=ecommerce-media \
