@@ -1,6 +1,8 @@
 {
   "realm": "ecommerce",
-  "displayName": "E-commerce",
+  "displayName": "Comptoir",
+  "displayNameHtml": "Comptoir",
+  "loginTheme": "comptoir",
   "internationalizationEnabled": true,
   "supportedLocales": [
     "fr"
@@ -13,6 +15,7 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": false,
+  "rememberMe": true,
   "verifyEmail": false,
   "bruteForceProtected": true,
   "permanentLockout": false,
@@ -61,6 +64,7 @@
     {
       "clientId": "ecommerce-bff",
       "name": "E-commerce BFF (browser login)",
+      "baseUrl": "http://localhost:8080/",
       "description": "Confidential client of the API: browser login, tokens kept server-side, session cookie only in the browser",
       "publicClient": false,
       "secret": "${BFF_CLIENT_SECRET}",

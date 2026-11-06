@@ -28,5 +28,9 @@ export default defineConfig({
     { name: 'setup', testMatch: /auth\.setup\.ts/, use: { trace: 'off', screenshot: 'off' } },
     { name: 'desktop', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: [/mobile\.spec\.ts/, /auth\.setup\.ts/] },
     { name: 'mobile', use: { ...devices['Pixel 7'] }, dependencies: ['setup'], testMatch: /mobile\.spec\.ts/ },
+    // README screenshots, on the demo data: only with npm run screenshots.
+    ...(process.env.SCREENSHOTS
+      ? [{ name: 'screenshots', testDir: './screenshots', testMatch: /\.shots\.ts/, dependencies: ['setup'], use: { ...devices['Desktop Chrome'] } }]
+      : []),
   ],
 });

@@ -1,11 +1,22 @@
-# E-commerce Backend — Spring Boot 4
+# Comptoir — e-commerce with Spring Boot 4 and React
 
 [![CI](https://github.com/kardiguemagassa/ecommerce/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/kardiguemagassa/ecommerce/actions/workflows/ci.yml)
 [![Release](https://github.com/kardiguemagassa/ecommerce/actions/workflows/release.yml/badge.svg)](https://github.com/kardiguemagassa/ecommerce/actions/workflows/release.yml)
 
-A simplified e-commerce REST API: product catalog with search and caching, shopping cart, and orders
-confirmed asynchronously. Built as a production-minded showcase: query optimization, transactional
-consistency, caching, observability and an automated test suite.
+A simplified e-commerce shop, **Comptoir**: a REST API (product catalog with search and caching, shopping cart,
+orders confirmed asynchronously) and its React front-end, behind nginx, with Keycloak for the accounts. Built as a
+production-minded showcase: query optimization, transactional consistency, caching, security (BFF, CSP),
+observability, accessibility and an automated test suite down to the browser. Changes: [CHANGELOG](CHANGELOG.md).
+
+| Catalogue | Product | Cart |
+|---|---|---|
+| ![Catalogue filtered by category](docs/screenshots/catalogue.png) | ![Product page](docs/screenshots/product.png) | ![Cart](docs/screenshots/cart.png) |
+| **Order followed live** | **Admin space** | **Login (Keycloak, theme of the shop)** |
+| ![Order tracking, confirmed](docs/screenshots/order.png) | ![Product panel of the admin space](docs/screenshots/admin.png) | ![Login page](docs/screenshots/login.png) |
+
+<p align="center"><img src="docs/screenshots/mobile-product.png" alt="Product page on a phone" width="260"></p>
+
+Screenshots taken by Playwright on the demo data (`./scripts/demo-data.py`, then `cd e2e && npm run screenshots`).
 
 ## Features
 
@@ -190,9 +201,15 @@ volume to re-import it). Secrets and passwords are placeholders resolved from `.
 | `ecommerce-bff` | Confidential client of the API: browser login (authorization code + PKCE), tokens kept server-side |
 | `ecommerce-swagger` | Public client of Swagger UI (authorization code + PKCE) |
 | Demo users | `alice@example.com` (`CUSTOMER`) and the shop administrator `SHOP_ADMIN_EMAIL` (`CUSTOMER`, `ADMIN`; `admin@example.com` in `.env.example`), password `DEMO_USER_PASSWORD` |
-| Policies | French login pages, self-registration with the e-mail as username, passwords of 12 characters minimum, brute-force protection, access tokens valid 5 minutes |
+| Policies | French login pages, self-registration with the e-mail as username, passwords of 12 characters minimum, "Rester connecté", brute-force protection, access tokens valid 5 minutes |
+| Login theme | `comptoir` ([`keycloak/themes/comptoir`](keycloak/themes/comptoir)): the official keycloak.v2 theme restyled to the look of the shop (colours, Inter and Manrope fonts, French wording, link back to the shop), templates and form ids unchanged for safe upgrades |
 
 Access tokens carry the audience `ecommerce-api` and the realm roles in a `roles` claim.
+
+A realm imported before the theme existed keeps the default Keycloak look: `./scripts/keycloak-theme.sh` applies the
+theme, the name "Comptoir", "Rester connecté" and the link back to the shop through the admin API (idempotent, no
+volume removed). The theme is mounted read-only and Keycloak runs in development mode: a change of
+`comptoir.css` shows on the next reload.
 
 #### Sign in with Google (optional)
 
@@ -352,6 +369,19 @@ MinIO, the usual choice, is no longer distributed as an image since 2025.
 
 ## Architecture
 
+At run time (`docker compose --profile app up`), the browser only knows two origins: the shop and Keycloak.
+
+```
+                       ┌─ /            React front-end (static, immutable assets)
+Browser ──► nginx  ────┼─ /api, /oauth2, /login, /logout ──► API (Spring Boot) ──► PostgreSQL 18
+   │       :8080 (web) └─ /media (read-only) ──┐                │  │  └──────────► SeaweedFS (S3): images
+   │                                           └────────────────┼──┼─────────────► (same bucket, public reads)
+   │                                                            │  └─ OTLP ──────► Grafana LGTM (traces, metrics, logs)
+   └──► Keycloak :8180 (login pages, theme "comptoir") ◄────────┘  tokens kept server-side (BFF)
+```
+
+Inside the API:
+
 ```
 src/main/java/com/kmgtechnologies/ecommerce
 ├── controller     REST layer: validation, HTTP mapping, sort allow-list
@@ -486,13 +516,14 @@ front-end (its own dependencies, never in an image).
 ```bash
 docker compose --profile app up -d --build --wait   # the stack, as for the smoke test
 cd e2e && nvm use && npm ci && npx playwright install chromium
-npm run e2e        # 21 tests, about 2 minutes; npm run e2e:ui for the interactive mode
+npm run e2e        # 24 tests, about 2 minutes; npm run e2e:ui for the interactive mode
 npm run e2e:report # the HTML report, with the trace of each failed test
 ```
 
 | Area | What is checked |
 |---|---|
 | Sign-in | Once per demo account (`.auth/`, ignored by Git), through the real Keycloak form; the password comes from `.env` and is never traced |
+| Keycloak pages | Look and wording of the shop, link back to it, wrong password and password rules in French, sign-up of a new customer back to the shop signed in |
 | Journeys | Visitor (catalogue, category, product, sign-in offered), purchase (cart, quantity, 409 above the stock, order followed until confirmed), profile photo, admin space (product created with its image and visible in the shop, category renamed with the keyboard, customer found), phone |
 | Security | Admin space refused to a customer, security headers, no token in the page's storage, and every test fails on a CSP violation or a script error |
 | Accessibility | axe (WCAG 2.1 A and AA) on every page, dialogs and side panels included: no violation of impact *serious* or *critical* |
@@ -509,6 +540,10 @@ report and traces kept 7 days as an artifact when a test fails.
 | Confirmation is lost if the app stops between commit and email (order stays `PENDING`) | Transactional outbox + retry, or a message broker |
 | Caffeine is local to one instance | Redis when running several instances |
 | `name LIKE '%x%'` cannot use a B-tree index | PostgreSQL `pg_trgm` GIN index or full-text search |
+| Keycloak runs in development mode (plain HTTP, no theme cache) | `start` with TLS and the theme packaged in a custom image |
+| No password reset nor e-mail verification (no mail server in the stack) | SMTP relay (Mailpit locally), then `resetPasswordAllowed` and `verifyEmail` |
+| No payment: an order is confirmed once stock is reserved | Payment provider (Stripe test mode) before confirmation, webhooks |
+| End-to-end data stays in a development database (an ordered product cannot be deleted) | Fresh database per run in CI (done); a reset script for local runs |
 | Async pool grows beyond 2 threads only when its queue (100) is full | Size `core-size` from `executor_queued_tasks` and confirmation latency |
 
 ## CI/CD

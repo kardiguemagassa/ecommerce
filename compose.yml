@@ -121,6 +121,8 @@ services:
       - "127.0.0.1:${KEYCLOAK_PORT:-8180}:8080"
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
+      # Login and registration pages in the look of the shop (start-dev: no theme cache, edits show on reload).
+      - ./keycloak/themes/comptoir:/opt/keycloak/themes/comptoir:ro
     networks: [default, keycloak-net]
     depends_on:
       keycloak-db:
