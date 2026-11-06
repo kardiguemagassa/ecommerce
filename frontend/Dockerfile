@@ -3,7 +3,7 @@
 # Web image of the shop: the React front-end served by nginx, which is also the single entry point to the API and
 # the media (see nginx/templates/default.conf.template). Built natively ($BUILDPLATFORM): the bundles are the same
 # for every architecture, only the nginx stage differs.
-FROM --platform=$BUILDPLATFORM node:24.22.2-alpine AS build
+FROM --platform=$BUILDPLATFORM node:26.12.1-alpine AS build
 WORKDIR /workspace
 COPY package.json package-lock.json .npmrc ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
