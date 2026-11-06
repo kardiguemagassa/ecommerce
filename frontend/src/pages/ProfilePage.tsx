@@ -7,7 +7,8 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { visuallyHidden } from '@mui/utils';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { AVATAR_TYPES, avatarProblem, useDeleteAvatar, useReplaceAvatar } from '../api/avatar';
+import { avatarProblem, useDeleteAvatar, useReplaceAvatar } from '../api/avatar';
+import { IMAGE_TYPES } from '../api/images';
 import { useSession } from '../api/session';
 import { notify } from '../app/notifications';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -102,7 +103,7 @@ function AvatarSection({ name, photo }: { name: string; photo?: string }) {
             <>
               <Button component="label" variant="contained" startIcon={<PhotoCameraOutlinedIcon />} disabled={busy}>
                 {fr.profile.change}
-                <Box component="input" type="file" accept={AVATAR_TYPES.join(',')} onChange={pick} sx={visuallyHidden} />
+                <Box component="input" type="file" accept={IMAGE_TYPES.join(',')} onChange={pick} sx={visuallyHidden} />
               </Button>
               {photo && (
                 <Button color="error" loading={remove.isPending} disabled={busy} onClick={() => setConfirming(true)}>

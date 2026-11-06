@@ -7,6 +7,7 @@ import com.kmgtechnologies.ecommerce.security.CurrentCustomer;
 import com.kmgtechnologies.ecommerce.service.CustomerService;
 import com.kmgtechnologies.ecommerce.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
@@ -20,10 +21,13 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Set;
 
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.BAD_REQUEST;
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.CONFLICT;
@@ -38,6 +42,8 @@ import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.STORAGE_UNAV
 @Tag(name = "Customers", description = "The signed-in customer, and customer support for administrators")
 @RestController
 public class CustomerController {
+
+    static final Set<String> SORTABLE_PROPERTIES = Set.of("id", "fullName", "email");
 
     private final CurrentCustomer currentCustomer;
     private final CustomerService customerService;
@@ -80,6 +86,19 @@ public class CustomerController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteAvatar() {
         customerService.deleteAvatar(currentCustomer.id());
+    }
+
+    @Operation(summary = "Search the customers (administrators)",
+            description = "Paginated, by name by default. Sortable properties: id, fullName, email. Maximum page size: 100.")
+    @ApiResponse(responseCode = "200", description = "Page of customers returned")
+    @ApiResponse(responseCode = "400", ref = BAD_REQUEST)
+    @GetMapping("/api/admin/customers")
+    public PagedModel<CustomerResponse> searchCustomers(
+            @Parameter(description = "Case-insensitive substring of the name or e-mail")
+            @RequestParam(required = false) String q,
+            @ParameterObject @PageableDefault(size = 20, sort = "fullName") Pageable pageable) {
+        SortValidation.requireAllowed(pageable.getSort(), SORTABLE_PROPERTIES);
+        return new PagedModel<>(customerService.search(q, pageable));
     }
 
     @Operation(summary = "Get a customer (administrators)")

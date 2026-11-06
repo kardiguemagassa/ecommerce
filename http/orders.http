@@ -96,3 +96,17 @@ Authorization: Bearer {{customerToken}}
 ### Order that is not mine → 404
 GET {{baseUrl}}/api/me/orders/999999
 Authorization: Bearer {{customerToken}}
+
+### Customer support: search the customers by name or e-mail (administrators) → 200
+GET {{baseUrl}}/api/admin/customers?q=alice
+Authorization: Bearer {{adminToken}}
+
+> {% client.global.set("customerId", response.body.content[0].id); %}
+
+### Their orders, newest first → 200
+GET {{baseUrl}}/api/admin/customers/{{customerId}}/orders
+Authorization: Bearer {{adminToken}}
+
+### Customer search by a customer → 403
+GET {{baseUrl}}/api/admin/customers
+Authorization: Bearer {{customerToken}}

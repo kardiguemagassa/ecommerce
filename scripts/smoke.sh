@@ -84,6 +84,17 @@ expect "$response" 201 "order placed"
 order=$(body "$response" | json "['id']")
 echo "OK  customer profile from the token, order $order placed through /api/me"
 
+# --- Customer support (administrators) ---------------------------------------------------------------------------
+response=$(call GET "/admin/customers?q=${CUSTOMER%%@*}" "$ADMIN")
+expect "$response" 200 "customer search by the administrator"
+customer=$(body "$response" | json "['content'][0]['id']")
+[ "$(body "$response" | json "['content'][0]['email']")" = "$CUSTOMER" ] || fail "customer search: $CUSTOMER not found"
+response=$(call GET "/admin/customers/$customer/orders" "$ADMIN")
+expect "$response" 200 "orders of the customer"
+[ "$(body "$response" | json "['content'][0]['id']")" = "$order" ] || fail "orders of the customer: latest is not order $order"
+expect "$(call GET /admin/customers "$ALICE")" 403 "customer search by a customer"
+echo "OK  customer support: $CUSTOMER found by the administrator with order $order on top, 403 for a customer"
+
 # --- Browser login through the API (BFF), as a browser would do it ----------------------------------------------
 jar=$(mktemp)
 image=$(mktemp)

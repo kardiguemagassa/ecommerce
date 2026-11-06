@@ -2,19 +2,12 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { notify } from '../app/notifications';
 import { fr } from '../i18n/fr';
 import { api } from './client';
+import { AVATAR_MAX_BYTES, imageProblem, imageUpload } from './images';
 import { unwrap } from './problem';
 import { sessionKey, type Session } from './session';
 
-/** What the API accepts for a profile photo; checked here first to spare a useless upload, checked again by the API. */
-export const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
-export const AVATAR_MAX_BYTES = 1024 * 1024;
-
-/** Why a chosen file cannot be a profile photo, or undefined when it can be sent. */
-export function avatarProblem(file: File): string | undefined {
-  if (!(AVATAR_TYPES as readonly string[]).includes(file.type)) return fr.errors.unsupportedImage;
-  if (file.size > AVATAR_MAX_BYTES) return fr.profile.tooLarge;
-  return undefined;
-}
+/** Why a chosen file cannot be a profile photo (type, 1 MB), or undefined when it can be sent. */
+export const avatarProblem = (file: File) => imageProblem(file, AVATAR_MAX_BYTES);
 
 /** The header shows the photo of the session: updated in place, it changes at once, without asking the API again. */
 function showInHeader(queryClient: QueryClient, avatarUrl: string | undefined) {
@@ -24,18 +17,7 @@ function showInHeader(queryClient: QueryClient, avatarUrl: string | undefined) {
 export function useReplaceAvatar() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) =>
-      unwrap(
-        api.PUT('/api/me/avatar', {
-          // The generated type of a binary part is a string; the browser sends the file as a multipart body.
-          body: { file: file as unknown as string },
-          bodySerializer: (body) => {
-            const form = new FormData();
-            form.append('file', body!.file as unknown as File);
-            return form;
-          },
-        }),
-      ),
+    mutationFn: (file: File) => unwrap(api.PUT('/api/me/avatar', imageUpload(file))),
     onSuccess: (customer) => {
       showInHeader(queryClient, customer.avatarUrl);
       notify.success(fr.profile.photoSaved);

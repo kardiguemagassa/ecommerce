@@ -267,6 +267,24 @@
         ],
         "type": "object"
       },
+      "PagedModelCustomerResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "content",
+          "page"
+        ],
+        "type": "object"
+      },
       "PagedModelOrderSummaryResponse": {
         "properties": {
           "content": {
@@ -495,6 +513,79 @@
   },
   "openapi": "3.0.1",
   "paths": {
+    "/api/admin/customers": {
+      "get": {
+        "description": "Paginated, by name by default. Sortable properties: id, fullName, email. Maximum page size: 100.",
+        "operationId": "searchCustomers",
+        "parameters": [
+          {
+            "description": "Case-insensitive substring of the name or e-mail",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Zero-based page index (0..N)",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The size of the page to be returned",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": [
+                "fullName,ASC"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedModelCustomerResponse"
+                }
+              }
+            },
+            "description": "Page of customers returned"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        },
+        "summary": "Search the customers (administrators)",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
     "/api/admin/customers/{id}": {
       "get": {
         "operationId": "findById_2",

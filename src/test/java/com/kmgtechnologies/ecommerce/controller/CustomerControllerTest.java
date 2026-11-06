@@ -16,6 +16,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -29,6 +30,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -91,6 +93,46 @@ class CustomerControllerTest {
         mockMvc.perform(get("/api/admin/customers/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("alice@example.com"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void admin_searchesTheCustomers_byNameByDefault() throws Exception {
+        when(customerService.search(eq("martin"), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(ALICE), invocation.getArgument(1), 1));
+
+        mockMvc.perform(get("/api/admin/customers").param("q", "martin"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].fullName").value("Alice Martin"))
+                .andExpect(jsonPath("$.page.totalElements").value(1));
+
+        verify(customerService).search(eq("martin"), argThat(pageable ->
+                pageable.getPageSize() == 20 && pageable.getSort().equals(Sort.by("fullName"))));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void admin_customerSearch_rejectsAnUnknownSortProperty() throws Exception {
+        mockMvc.perform(get("/api/admin/customers").param("sort", "externalId"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(customerService);
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void customerSearch_isForbiddenToCustomers() throws Exception {
+        mockMvc.perform(get("/api/admin/customers"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        verifyNoInteractions(customerService);
+    }
+
+    @Test
+    void customerSearch_needsAuthentication() throws Exception {
+        mockMvc.perform(get("/api/admin/customers"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

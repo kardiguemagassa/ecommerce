@@ -49,6 +49,11 @@ export const orderSummaries = [
   { id: 1027, status: 'CONFIRMED', totalAmount: 99.8, createdAt: '2026-10-22T12:00:00Z' },
 ];
 
+export const customers = [
+  { id: 1, fullName: 'Alice Martin', email: 'alice@example.com', avatarUrl: '/media/avatars/alice.jpg' },
+  { id: 2, fullName: 'Bob Durand', email: 'bob@example.com' },
+];
+
 export const server = setupServer(
   http.get('*/api/me/session', () => HttpResponse.json(anonymous)),
   http.get('*/api/me/cart', () => HttpResponse.json(emptyCart)),
@@ -59,6 +64,10 @@ export const server = setupServer(
       : HttpResponse.json({ status: 404, title: 'Not Found' }, { status: 404 }),
   ),
   http.get('*/api/categories', () => HttpResponse.json(categories)),
+  http.get('*/api/admin/customers', () => HttpResponse.json(pageOf(customers, customers.length, 20))),
+  http.get('*/api/admin/customers/:id', ({ params }) => HttpResponse.json(customers.find((customer) => customer.id === Number(params.id)))),
+  http.get('*/api/admin/customers/:id/orders', () => HttpResponse.json(pageOf(orderSummaries, orderSummaries.length, 20))),
+  http.get('*/api/admin/customers/:id/orders/:orderId', () => HttpResponse.json(order)),
   http.get('*/api/products/top-selling', () => HttpResponse.json([])),
   http.get('*/api/products/:id', ({ params }) => {
     const product = products.find((item) => item.id === Number(params.id));

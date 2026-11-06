@@ -46,6 +46,7 @@ const conflictByTitle: Record<string, string> = {
   'Insufficient stock': fr.errors.insufficientStock,
   'Resource already exists': fr.errors.duplicate,
   'Resource in use': fr.errors.inUse,
+  'Data integrity violation': fr.errors.linked,
   'Empty cart': fr.errors.emptyCart,
   'Concurrent modification': fr.errors.concurrentModification,
 };
