@@ -100,7 +100,7 @@ services:
   # Identity provider: realm "ecommerce" imported from ./keycloak at first start (an existing realm is never
   # overwritten). Development mode (plain HTTP); production would run "start" behind TLS.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.8.1
+    image: quay.io/keycloak/keycloak:26.8.2
     command: ["start-dev", "--import-realm"]
     environment:
       KC_DB: postgres
