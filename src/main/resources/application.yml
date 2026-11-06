@@ -124,6 +124,7 @@ app:
     # Relative: the address the browser used (nginx on 8080, Vite on 5173); absolute for a front-end on another origin.
     front-url: ${BFF_FRONT_URL:/}
     end-session-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/ecommerce}/protocol/openid-connect/logout
+    account-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/ecommerce}/account
 
   # Product images and avatars: object storage over the S3 API (SeaweedFS in development, compose service "media").
   # The database keeps object keys; browsers read the objects at public-url (the bucket here, /media behind nginx).

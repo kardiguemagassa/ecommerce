@@ -2,6 +2,7 @@ package com.kmgtechnologies.ecommerce.controller;
 
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CartResponse;
+import com.kmgtechnologies.ecommerce.dto.UpdateCartItemRequest;
 import com.kmgtechnologies.ecommerce.security.CurrentCustomer;
 import com.kmgtechnologies.ecommerce.service.CartService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,12 +14,14 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.BAD_REQUEST;
+import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.CONFLICT;
 import static com.kmgtechnologies.ecommerce.config.OpenApiResponses.NOT_FOUND;
 
 @Tag(name = "Cart", description = "Cart of the signed-in customer (one cart per customer)")
@@ -46,9 +49,22 @@ public class CartController {
     @ApiResponse(responseCode = "200", description = "Updated cart")
     @ApiResponse(responseCode = "400", ref = BAD_REQUEST)
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)
+    @ApiResponse(responseCode = "409", ref = CONFLICT)
     @PostMapping("/items")
     public CartResponse addItem(@Valid @RequestBody AddCartItemRequest request) {
         return cartService.addItem(currentCustomer.id(), request);
+    }
+
+    @Operation(summary = "Change the quantity of a cart line",
+            description = "Sets the quantity (not added to it). The stock is checked against the new quantity.")
+    @ApiResponse(responseCode = "200", description = "Updated cart")
+    @ApiResponse(responseCode = "400", ref = BAD_REQUEST)
+    @ApiResponse(responseCode = "404", ref = NOT_FOUND)
+    @ApiResponse(responseCode = "409", ref = CONFLICT)
+    @PutMapping("/items/{productId}")
+    public CartResponse changeQuantity(@PathVariable Long productId,
+                                       @Valid @RequestBody UpdateCartItemRequest request) {
+        return cartService.changeQuantity(currentCustomer.id(), productId, request);
     }
 
     @Operation(summary = "Remove a product from the cart")

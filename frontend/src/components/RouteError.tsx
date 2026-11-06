@@ -17,16 +17,21 @@ export function RouteError() {
   const navigate = useNavigate();
 
   if (isRouteErrorResponse(error) && error.status === 404) {
-    const product = (error.data as NotFound | undefined)?.kind === 'product';
+    const kind = (error.data as NotFound | undefined)?.kind;
     return (
       <Notice
-        title={product ? fr.product.notFound : fr.pages.notFound}
-        hint={product ? fr.product.notFoundHint : fr.pages.notFoundHint}
-        icon={<SearchOffIcon color="primary" fontSize="large" />}
-      >
-        <Button component={RouterLink} to="/" variant="contained">
-          {fr.pages.backToCatalog}
-        </Button>
+        title={kind ? fr[kind].notFound : fr.pages.notFound}
+        hint={kind ? fr[kind].notFoundHint : fr.pages.notFoundHint}
+        icon={<SearchOffIcon color="primary" fontSize="large" />}>
+        {kind === 'order' ? (
+          <Button component={RouterLink} to="/commandes" variant="contained">
+            {fr.order.allOrders}
+          </Button>
+        ) : (
+          <Button component={RouterLink} to="/" variant="contained">
+            {fr.pages.backToCatalog}
+          </Button>
+        )}
       </Notice>
     );
   }

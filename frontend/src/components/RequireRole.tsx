@@ -33,11 +33,12 @@ export function RequireRole({ role }: { role: Role }) {
   return <Outlet />;
 }
 
-export function Notice({ title, hint, icon, children }: { title: string; hint: string; icon?: ReactNode; children?: ReactNode }) {
+/** A centred message with its way out: sign-in required, page not found, empty cart... `heading`: h2 inside a titled page. */
+export function Notice({ title, hint, icon, heading = 'h1', children }: { title: string; hint: string; icon?: ReactNode; heading?: 'h1' | 'h2'; children?: ReactNode }) {
   return (
     <Paper variant="outlined" sx={{ p: 4, maxWidth: 520, mx: 'auto', textAlign: 'center', display: 'grid', gap: 1.5, justifyItems: 'center' }}>
       {icon ?? <LockOutlinedIcon color="primary" fontSize="large" />}
-      <Typography variant="h1" component="h1" sx={{ fontSize: '1.5rem' }}>
+      <Typography variant="h1" component={heading} sx={{ fontSize: '1.5rem' }}>
         {title}
       </Typography>
       <Typography color="text.secondary">{hint}</Typography>

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { api, readCookie } from './client';
 import { ApiError, unwrap } from './problem';
 
@@ -10,6 +10,8 @@ export interface Session {
   email?: string;
   roles: string[];
   avatarUrl?: string;
+  /** Keycloak account console: name, e-mail and password are changed there. */
+  accountUrl?: string;
 }
 
 export const sessionKey = ['session'] as const;
@@ -23,11 +25,14 @@ export async function fetchSession(): Promise<Session> {
     email: session.email,
     roles: session.roles ?? [],
     avatarUrl: session.avatarUrl,
+    accountUrl: session.accountUrl,
   };
 }
 
+export const sessionQuery = () => queryOptions({ queryKey: sessionKey, queryFn: fetchSession, staleTime: 60_000 });
+
 export function useSession() {
-  return useQuery({ queryKey: sessionKey, queryFn: fetchSession, staleTime: 60_000 });
+  return useQuery(sessionQuery());
 }
 
 export function hasRole(session: Session | undefined, role: Role): boolean {

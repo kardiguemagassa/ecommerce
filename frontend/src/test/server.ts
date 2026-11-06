@@ -25,9 +25,39 @@ export function pageOf<T>(content: T[], total = content.length, size = 12, numbe
 
 export const emptyCart = { customerId: 1, items: [], totalQuantity: 0, total: 0 };
 
+/** Alice's cart: 2 keyboards and 1 mouse. */
+export const cart = {
+  customerId: 1,
+  items: [
+    { productId: 10, productName: keyboard.name, unitPrice: 89.9, quantity: 2, subtotal: 179.8, imageUrl: keyboard.imageUrl },
+    { productId: 11, productName: mouse.name, unitPrice: 39.9, quantity: 1, subtotal: 39.9 },
+  ],
+  totalQuantity: 3,
+  total: 219.7,
+};
+
+/** Noon UTC: the same day in every time zone a test may run in. */
+export const order = {
+  id: 1042, customerId: 1, status: 'CONFIRMED', totalAmount: 219.7, createdAt: '2026-11-05T12:00:00Z',
+  items: [
+    { productId: 10, productName: keyboard.name, unitPrice: 89.9, quantity: 2, subtotal: 179.8 },
+    { productId: 11, productName: mouse.name, unitPrice: 39.9, quantity: 1, subtotal: 39.9 },
+  ],
+};
+export const orderSummaries = [
+  { id: 1042, status: 'PENDING', totalAmount: 219.7, createdAt: '2026-11-05T12:00:00Z' },
+  { id: 1027, status: 'CONFIRMED', totalAmount: 99.8, createdAt: '2026-10-22T12:00:00Z' },
+];
+
 export const server = setupServer(
   http.get('*/api/me/session', () => HttpResponse.json(anonymous)),
   http.get('*/api/me/cart', () => HttpResponse.json(emptyCart)),
+  http.get('*/api/me/orders', () => HttpResponse.json(pageOf(orderSummaries, orderSummaries.length, 10))),
+  http.get('*/api/me/orders/:id', ({ params }) =>
+    Number(params.id) === order.id
+      ? HttpResponse.json(order)
+      : HttpResponse.json({ status: 404, title: 'Not Found' }, { status: 404 }),
+  ),
   http.get('*/api/categories', () => HttpResponse.json(categories)),
   http.get('*/api/products/top-selling', () => HttpResponse.json([])),
   http.get('*/api/products/:id', ({ params }) => {

@@ -49,6 +49,16 @@ public class Cart {
                 () -> items.add(new CartItem(this, product, quantity)));
     }
 
+    /** Sets the quantity of a line; false when the product is not in the cart. */
+    public boolean changeQuantity(Long productId, int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be positive");
+        }
+        Optional<CartItem> item = findItem(productId);
+        item.ifPresent(line -> line.setQuantity(quantity));
+        return item.isPresent();
+    }
+
     public boolean removeItem(Long productId) {
         return items.removeIf(item -> Objects.equals(item.getProduct().getId(), productId));
     }

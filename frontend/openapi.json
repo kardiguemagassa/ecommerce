@@ -414,6 +414,9 @@
       },
       "Session": {
         "properties": {
+          "accountUrl": {
+            "type": "string"
+          },
           "authenticated": {
             "type": "boolean"
           },
@@ -449,6 +452,20 @@
             "type": "integer"
           }
         },
+        "type": "object"
+      },
+      "UpdateCartItemRequest": {
+        "properties": {
+          "quantity": {
+            "exclusiveMinimum": true,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quantity"
+        ],
         "type": "object"
       }
     },
@@ -959,6 +976,9 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         },
         "summary": "Add a product to the cart",
@@ -997,6 +1017,56 @@
           }
         },
         "summary": "Remove a product from the cart",
+        "tags": [
+          "Cart"
+        ]
+      },
+      "put": {
+        "description": "Sets the quantity (not added to it). The stock is checked against the new quantity.",
+        "operationId": "changeQuantity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCartItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartResponse"
+                }
+              }
+            },
+            "description": "Updated cart"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        },
+        "summary": "Change the quantity of a cart line",
         "tags": [
           "Cart"
         ]
@@ -1130,7 +1200,7 @@
     },
     "/api/me/session": {
       "get": {
-        "description": "Public: answers `authenticated: false` without a session. Sign in by navigating to `/oauth2/authorization/keycloak`, sign out with `POST /logout` (CSRF header), then navigate to the returned `logoutUrl`. `avatarUrl`: profile photo for the navigation bar, null without one.",
+        "description": "Public: answers `authenticated: false` without a session. Sign in by navigating to `/oauth2/authorization/keycloak`, sign out with `POST /logout` (CSRF header), then navigate to the returned `logoutUrl`. `avatarUrl`: profile photo for the navigation bar, null without one. `accountUrl`: the Keycloak account console (name, e-mail, password), null when signed out.",
         "operationId": "session",
         "responses": {
           "200": {

@@ -1,7 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { data, type LoaderFunctionArgs, type RouteObject } from 'react-router';
+import { cartQuery } from '../api/cart';
 import { bestSellersQuery, categoriesQuery, productListQuery, productQuery, type Product } from '../api/catalog';
+import { orderPageFrom, orderQuery, ordersQuery, type Order } from '../api/orders';
 import { ApiError } from '../api/problem';
+import { hasRole, sessionQuery } from '../api/session';
 import { filtersFrom } from '../catalog/filters';
 import { Layout, type RouteHandle } from '../components/Layout';
 import { PageFallback } from '../components/PageFallback';
@@ -13,8 +16,38 @@ const titled = (title: RouteHandle['title']): RouteHandle => ({ title });
 
 /** What a 404 thrown by a loader is about: the error boundary words it accordingly. */
 export interface NotFound {
-  kind: 'product';
+  kind: 'product' | 'order';
 }
+
+const notFound = (kind: NotFound['kind']) => data<NotFound>({ kind }, { status: 404 });
+
+/** A positive integer from the address, or a 404 of the route. */
+function idParam(value: string | undefined, kind: NotFound['kind']): number {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id < 1) throw notFound(kind);
+  return id;
+}
+
+/** Gets a resource through the query cache; its 404 becomes a 404 of the route (shown in the page, header kept). */
+async function orNotFound<T>(load: Promise<T>, kind: NotFound['kind']): Promise<T> {
+  try {
+    return await load;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) throw notFound(kind);
+    throw error;
+  }
+}
+
+/**
+ * Loader of a customer page: fetches its data only for a signed-in customer. Otherwise it returns nothing and the
+ * route guard asks to sign in, without a failed call nor an error toast.
+ */
+const forCustomer =
+  <T,>(queryClient: QueryClient, load: (args: LoaderFunctionArgs) => Promise<T>) =>
+  async (args: LoaderFunctionArgs): Promise<T | null> => {
+    const session = await queryClient.ensureQueryData(sessionQuery());
+    return hasRole(session, 'CUSTOMER') ? load(args) : null;
+  };
 
 /**
  * Catalogue: the page of products and the categories are fetched while the page module loads (render as you fetch),
@@ -36,15 +69,24 @@ const catalogLoader =
 const productLoader =
   (queryClient: QueryClient) =>
   async ({ params }: LoaderFunctionArgs): Promise<Product> => {
-    const id = Number(params.id);
-    if (!Number.isInteger(id) || id < 1) throw data<NotFound>({ kind: 'product' }, { status: 404 });
-    try {
-      return await queryClient.ensureQueryData({ ...productQuery(id), revalidateIfStale: true });
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) throw data<NotFound>({ kind: 'product' }, { status: 404 });
-      throw error;
-    }
+    const id = idParam(params.id, 'product');
+    return orNotFound(queryClient.ensureQueryData({ ...productQuery(id), revalidateIfStale: true }), 'product');
   };
+
+const cartLoader = (queryClient: QueryClient) =>
+  forCustomer(queryClient, () => queryClient.ensureQueryData({ ...cartQuery(), revalidateIfStale: true }));
+
+const ordersLoader = (queryClient: QueryClient) =>
+  forCustomer(queryClient, ({ request }) =>
+    queryClient.ensureQueryData({ ...ordersQuery(orderPageFrom(new URL(request.url).searchParams)), revalidateIfStale: true }),
+  );
+
+/** Order tracking: an unknown order, or another customer's (the API answers 404 alike), is a 404 of the route. */
+const orderLoader = (queryClient: QueryClient) =>
+  forCustomer(queryClient, ({ params }) => {
+    const id = idParam(params.id, 'order');
+    return orNotFound(queryClient.ensureQueryData({ ...orderQuery(id), revalidateIfStale: true }), 'order');
+  });
 
 /**
  * Route map of the shop, in French as the user sees it. Every page is its own chunk, fetched on the first visit
@@ -79,16 +121,19 @@ export const createRoutes = (queryClient: QueryClient): RouteObject[] => [
               {
                 path: 'panier',
                 handle: titled(fr.pages.cart),
+                loader: cartLoader(queryClient),
                 lazy: () => import('../pages/CartPage').then((module) => ({ Component: module.CartPage })),
               },
               {
                 path: 'commandes',
                 handle: titled(fr.pages.orders),
+                loader: ordersLoader(queryClient),
                 lazy: () => import('../pages/OrdersPage').then((module) => ({ Component: module.OrdersPage })),
               },
               {
                 path: 'commandes/:id',
-                handle: titled(fr.pages.order),
+                handle: titled((order) => ((order as Order | null)?.id ? fr.order.title((order as Order).id!) : fr.pages.order)),
+                loader: orderLoader(queryClient),
                 lazy: () => import('../pages/OrderPage').then((module) => ({ Component: module.OrderPage })),
               },
               {
