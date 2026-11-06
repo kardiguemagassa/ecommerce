@@ -477,6 +477,30 @@ shared by all Spring contexts.
 
 290 tests (261 unit/slice, 29 integration), plus 90 front-end tests. Coverage report: `target/site/jacoco/index.html`.
 
+### End-to-end tests (Playwright)
+
+The shop in a real browser (Chromium, desktop and Pixel 7) on the whole stack: nginx and its CSP, the BFF session,
+the Keycloak login form, the API, PostgreSQL and the media storage. They live in [`e2e/`](e2e), apart from the
+front-end (its own dependencies, never in an image).
+
+```bash
+docker compose --profile app up -d --build --wait   # the stack, as for the smoke test
+cd e2e && nvm use && npm ci && npx playwright install chromium
+npm run e2e        # 21 tests, about 2 minutes; npm run e2e:ui for the interactive mode
+npm run e2e:report # the HTML report, with the trace of each failed test
+```
+
+| Area | What is checked |
+|---|---|
+| Sign-in | Once per demo account (`.auth/`, ignored by Git), through the real Keycloak form; the password comes from `.env` and is never traced |
+| Journeys | Visitor (catalogue, category, product, sign-in offered), purchase (cart, quantity, 409 above the stock, order followed until confirmed), profile photo, admin space (product created with its image and visible in the shop, category renamed with the keyboard, customer found), phone |
+| Security | Admin space refused to a customer, security headers, no token in the page's storage, and every test fails on a CSP violation or a script error |
+| Accessibility | axe (WCAG 2.1 A and AA) on every page, dialogs and side panels included: no violation of impact *serious* or *critical* |
+
+Each run creates its own data through the API (names `E2E … <run>`), so runs never collide; on a development
+database they stay (an ordered product cannot be deleted). CI runs them on a fresh stack in the `e2e` job, the HTML
+report and traces kept 7 days as an artifact when a test fails.
+
 ## Known limitations and next steps
 
 | Limitation | Next step |
@@ -491,7 +515,7 @@ shared by all Spring contexts.
 
 | Workflow | When | What |
 |---|---|---|
-| [CI](.github/workflows/ci.yml) | Every pull request to `dev`/`main`, every push to `dev` | `build`: `./mvnw verify` (tests on PostgreSQL 18, coverage summary), OpenAPI contract of the front-end up to date. `frontend`: lint, types, tests, build. `smoke`: the Compose stack built and started, then `scripts/smoke.sh` |
+| [CI](.github/workflows/ci.yml) | Every pull request to `dev`/`main`, every push to `dev` | `build`: `./mvnw verify` (tests on PostgreSQL 18, coverage summary), OpenAPI contract of the front-end up to date. `frontend`: lint, types, tests, build. `smoke`: the Compose stack built and started, then `scripts/smoke.sh`. `e2e`: another stack, then Playwright and axe |
 | [Release](.github/workflows/release.yml) | Push to `main`, tag `vX.Y.Z` | Tests again, image scanned by Trivy (no fixable CRITICAL vulnerability), then pushed to Docker Hub for amd64 and arm64 with SBOM and provenance |
 | [Dependabot](.github/dependabot.yml) | Weekly | Update pull requests to `dev`: GitHub Actions, Maven, Dockerfile and Compose images |
 
