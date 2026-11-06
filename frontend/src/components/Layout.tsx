@@ -9,8 +9,8 @@ import { Toaster } from './Toaster';
 
 /** What a route declares for the layout (route `handle`). */
 export interface RouteHandle {
-  /** Title of the page, also used for the browser tab. */
-  title: string;
+  /** Title of the page for the browser tab: fixed, or from the data of the route loader (a product's name). */
+  title: string | ((loaderData: unknown) => string);
 }
 
 export function Layout() {
@@ -51,7 +51,13 @@ export function Layout() {
 /** Browser tab: "<page> · Comptoir", from the deepest route that declares a title. */
 function useDocumentTitle() {
   const matches = useMatches();
-  const title = [...matches].reverse().map((match) => (match.handle as RouteHandle | undefined)?.title).find(Boolean);
+  const title = [...matches]
+    .reverse()
+    .map((match) => {
+      const handle = match.handle as RouteHandle | undefined;
+      return typeof handle?.title === 'function' ? handle.title(match.loaderData) : handle?.title;
+    })
+    .find(Boolean);
   useEffect(() => {
     document.title = title ? `${title} · ${fr.appName}` : fr.appName;
   }, [title]);

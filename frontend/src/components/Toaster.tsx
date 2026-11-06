@@ -1,6 +1,8 @@
+import CloseIcon from '@mui/icons-material/Close';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import Snackbar, { type SnackbarCloseReason } from '@mui/material/Snackbar';
 import { useState } from 'react';
 import { dismissToast, durationOf, useCurrentToast, type Toast } from '../app/notifications';
@@ -41,6 +43,26 @@ function ToastView({ toast }: { toast: Toast }) {
         variant="filled"
         role={toast.severity === 'error' ? 'alert' : 'status'}
         onClose={() => setOpen(false)}
+        action={
+          toast.action ? (
+            <>
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  setOpen(false);
+                  toast.action!.onClick();
+                }}
+                sx={{ fontWeight: 700, textDecoration: 'underline', alignSelf: 'center' }}
+              >
+                {toast.action.label}
+              </Button>
+              <IconButton aria-label={fr.errors.close} color="inherit" size="small" onClick={() => setOpen(false)}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </>
+          ) : undefined
+        }
         slotProps={{ closeButton: { 'aria-label': fr.errors.close } }}
         sx={{ maxWidth: 480, alignItems: 'flex-start' }}
       >

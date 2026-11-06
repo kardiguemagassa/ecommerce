@@ -4,12 +4,19 @@ import { fr } from '../i18n/fr';
 
 export type Severity = 'success' | 'info' | 'warning' | 'error';
 
+/** A button of a toast: "Se connecter", "Voir le panier"... */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 /** A message shown to the user as a toast; errors carry the trace id of the request when the API sent one. */
 export interface Toast {
   id: number;
   severity: Severity;
   message: string;
   traceId?: string;
+  action?: ToastAction;
 }
 
 /** Display time; null keeps the toast until closed (an error to quote to the support must not vanish). */
@@ -29,10 +36,10 @@ function publish(next: readonly Toast[]) {
   listeners.forEach((listener) => listener());
 }
 
-function push(severity: Severity, message: string, traceId?: string) {
+function push(severity: Severity, message: string, traceId?: string, action?: ToastAction) {
   // The same message twice in a row (several queries failing for one reason) is shown once.
   if (queue.some((toast) => toast.message === message && toast.traceId === traceId)) return;
-  publish([...queue, { id: nextId++, severity, message, traceId }].slice(-MAX_QUEUED));
+  publish([...queue, { id: nextId++, severity, message, traceId, action }].slice(-MAX_QUEUED));
 }
 
 /**
@@ -40,9 +47,9 @@ function push(severity: Severity, message: string, traceId?: string) {
  * cache. Errors accept anything thrown: an ApiError shows its French message and its trace id.
  */
 export const notify = {
-  success: (message: string) => push('success', message),
-  info: (message: string) => push('info', message),
-  warning: (message: string) => push('warning', message),
+  success: (message: string, action?: ToastAction) => push('success', message, undefined, action),
+  info: (message: string, action?: ToastAction) => push('info', message, undefined, action),
+  warning: (message: string, action?: ToastAction) => push('warning', message, undefined, action),
   error: (error: unknown) => {
     if (error instanceof ApiError) push('error', error.message, error.traceId);
     else push('error', typeof error === 'string' ? error : fr.errors.unexpected);

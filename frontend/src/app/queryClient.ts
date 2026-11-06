@@ -1,4 +1,4 @@
-import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient, type Query } from '@tanstack/react-query';
 import { ApiError } from '../api/problem';
 import { sessionKey } from '../api/session';
 import { notify } from './notifications';
@@ -10,7 +10,11 @@ import { notify } from './notifications';
  */
 export function createQueryClient(): QueryClient {
   const client: QueryClient = new QueryClient({
-    queryCache: new QueryCache({ onError: (error) => onError(client, error) }),
+    queryCache: new QueryCache({
+      onError: (error, query) => {
+        if (!isQuietNotFound(error, query)) onError(client, error);
+      },
+    }),
     mutationCache: new MutationCache({ onError: (error) => onError(client, error) }),
     defaultOptions: {
       queries: {
@@ -19,6 +23,19 @@ export function createQueryClient(): QueryClient {
     },
   });
   return client;
+}
+
+declare module '@tanstack/react-query' {
+  interface Register {
+    queryMeta: {
+      /** A 404 is part of the page (a product that no longer exists), not an error to toast. */
+      quietNotFound?: boolean;
+    };
+  }
+}
+
+function isQuietNotFound(error: Error, query: Query<unknown, unknown, unknown, readonly unknown[]>) {
+  return error instanceof ApiError && error.status === 404 && query.meta?.quietNotFound === true;
 }
 
 function onError(client: QueryClient, error: Error) {

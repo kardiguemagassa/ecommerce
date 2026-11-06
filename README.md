@@ -88,6 +88,9 @@ docker compose --profile app up -d --build --wait
 
 # Stop (data kept): with the profile, or the API and web containers keep running; -v deletes the volumes
 docker compose --profile app down
+
+# Demo catalogue (5 categories, 20 products with generated images, a few orders): idempotent, through the API
+./scripts/demo-data.py
 ```
 
 Every port is published on `127.0.0.1` only. In Docker, **nginx is the single entry point** (`web` service): the
@@ -133,6 +136,14 @@ npm run dev        # http://localhost:5173
   `src/api/schema.d.ts` is generated (`npm run api:types`, run before `dev`, `build`, `lint`, `typecheck` and `test`).
   `./mvnw verify` exports the live contract to `target/openapi.json`; CI fails when the copy in `frontend/` differs.
   After an API change: `./mvnw verify`, then `npm run api:sync` in `frontend/`, and commit `openapi.json`.
+- **Catalogue** (`/`): best sellers, products 12 per page with their image, category, price and availability; the
+  search, category, order and page live in the URL (`/?q=clavier&categorie=1&tri=prix-croissant&page=2`), so a
+  search can be bookmarked or shared and the back button works. **Product page** (`/produits/:id`): quantity limited
+  to the stock, a removed product is a 404 inside the page. **Add to cart**: the cart returned by the API replaces the
+  cached one (badge updated without extra request), with a confirmation toast; anonymous visitors get a toast with a
+  "Se connecter" button.
+- **Data fetched with the page**: route loaders fill the TanStack Query cache while the page module loads; query keys
+  from one factory (`productKeys`), next page of results prefetched.
 - **Pages loaded on demand**: each route is its own chunk (React Router `lazy`), with a progress bar while it
   arrives, the browser tab named after the page, focus moved to the new content after a navigation and a skip link.
   A page that fails keeps the header usable; after a deployment, a tab on the previous release offers to reload.
@@ -459,9 +470,9 @@ shared by all Spring contexts.
 | Security | `@WebMvcTest` with `@WithMockUser` / `oidcLogin()`, JUnit | 401 / 403 per route, CSRF on session writes, session endpoint, logout URL, roles of the ID token, first-call provisioning |
 | Images | JUnit, Mockito | Format detection, decompression bombs, EXIF orientation and removal, crop and size, storage kept in step with commits and rollbacks |
 | Integration (`*IT`) | `@SpringBootTest`, Testcontainers SeaweedFS | Async confirmation, caching, Actuator exposure, OpenAPI contract and its production switch, images served publicly and deleted |
-| Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors (429, 413 included), header signed in or not, protected pages, session expiry, toasts (queue, durations, roles), lazy routes (titles, focus, stale chunk after a deployment) |
+| Front-end | Vitest, Testing Library, MSW | CSRF header on writes, French messages and `traceId` of API errors (429, 413 included), header signed in or not, protected pages, session expiry, toasts (queue, durations, roles, actions), lazy routes (titles, focus, stale chunk after a deployment), catalogue (URL state sent to the API, filters, pagination links, empty results, best sellers), product page (quantity bounds, 404), add to cart (badge, toasts, anonymous visitor, insufficient stock) |
 
-273 tests (244 unit/slice, 29 integration), plus 35 front-end tests. Coverage report: `target/site/jacoco/index.html`.
+273 tests (244 unit/slice, 29 integration), plus 54 front-end tests. Coverage report: `target/site/jacoco/index.html`.
 
 ## Known limitations and next steps
 

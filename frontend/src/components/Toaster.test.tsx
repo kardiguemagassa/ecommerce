@@ -63,6 +63,18 @@ describe('Toasts', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('can carry an action, which closes the toast', async () => {
+    const user = userEvent.setup();
+    let clicked = false;
+    render(<Toaster />);
+
+    act(() => notify.info('Connectez-vous pour ajouter des produits au panier.', { label: 'Se connecter', onClick: () => (clicked = true) }));
+    await user.click(await screen.findByRole('button', { name: 'Se connecter' }));
+
+    expect(clicked).toBe(true);
+    await waitForElementToBeRemoved(() => screen.queryByText('Connectez-vous pour ajouter des produits au panier.'));
+  });
+
   it('last 4 s for a success, 6 s for a warning, until closed for an error with a trace id', () => {
     expect(durationOf({ id: 1, severity: 'success', message: '' })).toBe(4000);
     expect(durationOf({ id: 1, severity: 'info', message: '' })).toBe(4000);

@@ -19,6 +19,7 @@ import { AccountMenu } from './AccountMenu';
 
 export function Header() {
   const { data: session, isPending } = useSession();
+  const [searchParams] = useSearchParams();
   const isCustomer = hasRole(session, 'CUSTOMER');
   const { data: cart } = useCart(isCustomer);
   const count = cart?.totalQuantity ?? 0;
@@ -44,7 +45,8 @@ export function Header() {
           </Box>
         </Link>
 
-        <SearchForm />
+        {/* Keyed by the searched term: the field follows the URL (back button, "Effacer les filtres"). */}
+        <SearchForm key={searchParams.get('q') ?? ''} />
 
         <Box component="nav" aria-label="Compte" sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: { xs: 'auto', md: 0 } }}>
           {isCustomer && (
