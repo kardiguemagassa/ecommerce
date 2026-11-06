@@ -4,6 +4,7 @@ import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CartItemResponse;
 import com.kmgtechnologies.ecommerce.dto.CartResponse;
+import com.kmgtechnologies.ecommerce.dto.UpdateCartItemRequest;
 import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.service.CartService;
@@ -35,6 +36,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,7 +48,8 @@ class CartControllerTest {
 
     private static final CartResponse CART_WITH_LAPTOP = new CartResponse(
             1L,
-            List.of(new CartItemResponse(10L, "Laptop", new BigDecimal("999.99"), 2, new BigDecimal("1999.98"))),
+            List.of(new CartItemResponse(10L, "Laptop", new BigDecimal("999.99"), 2, new BigDecimal("1999.98"),
+                    "http://media.test/products/laptop.jpg")),
             2,
             new BigDecimal("1999.98"));
 
@@ -121,6 +124,75 @@ class CartControllerTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("Insufficient stock for 'Laptop': requested 11, available 10"));
+    }
+
+    @Test
+    void changeQuantity_returnsUpdatedCart() throws Exception {
+        when(cartService.changeQuantity(1L, 10L, new UpdateCartItemRequest(2))).thenReturn(CART_WITH_LAPTOP);
+
+        mockMvc.perform(put("/api/me/cart/items/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity": 2}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].quantity").value(2))
+                .andExpect(jsonPath("$.total").value(1999.98));
+    }
+
+    @Test
+    void changeQuantity_returns400WhenQuantityIsNotPositive() throws Exception {
+        mockMvc.perform(put("/api/me/cart/items/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity": 0}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.quantity").value("Quantity must be positive"));
+
+        verifyNoInteractions(cartService);
+    }
+
+    @Test
+    void changeQuantity_returns409WhenStockIsInsufficient() throws Exception {
+        when(cartService.changeQuantity(1L, 10L, new UpdateCartItemRequest(11)))
+                .thenThrow(new InsufficientStockException("Laptop", 11, 10));
+
+        mockMvc.perform(put("/api/me/cart/items/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity": 11}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Insufficient stock for 'Laptop': requested 11, available 10"));
+    }
+
+    @Test
+    void changeQuantity_returns404WhenProductIsNotInCart() throws Exception {
+        when(cartService.changeQuantity(1L, 10L, new UpdateCartItemRequest(1)))
+                .thenThrow(new ResourceNotFoundException("Product 10 is not in the cart"));
+
+        mockMvc.perform(put("/api/me/cart/items/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity": 1}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Product 10 is not in the cart"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void changeQuantity_requiresTheCustomerRole() throws Exception {
+        mockMvc.perform(put("/api/me/cart/items/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity": 1}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        verifyNoInteractions(cartService);
     }
 
     @Test

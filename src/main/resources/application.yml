@@ -49,6 +49,12 @@ spring:
       pageable:
         max-page-size: 100
 
+  # Image uploads: the largest kind (product image, 2 MB); avatars are limited to 1 MB by the application.
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+
   task:
     execution:
       thread-name-prefix: async-
@@ -59,6 +65,9 @@ spring:
 
 # Browser session of the BFF: HttpOnly cookie, never sent by cross-site requests (SameSite=Lax); Secure behind HTTPS.
 server:
+  # Behind nginx: scheme, host and port of the browser from X-Forwarded-*, trusted from private networks only
+  # (Tomcat RemoteIpValve). OAuth2 redirect URIs and the logout URL are built on them.
+  forward-headers-strategy: native
   servlet:
     session:
       timeout: 30m
@@ -112,8 +121,22 @@ management:
 # target; until then, the session endpoint shows the result.
 app:
   bff:
-    front-url: ${BFF_FRONT_URL:http://localhost:8080/api/me/session}
+    # Relative: the address the browser used (nginx on 8080, Vite on 5173); absolute for a front-end on another origin.
+    front-url: ${BFF_FRONT_URL:/}
     end-session-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/ecommerce}/protocol/openid-connect/logout
+    account-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/ecommerce}/account
+
+  # Product images and avatars: object storage over the S3 API (SeaweedFS in development, compose service "media").
+  # The database keeps object keys; browsers read the objects at public-url (the bucket here, /media behind nginx).
+  media:
+    endpoint: ${MEDIA_ENDPOINT:http://localhost:8333}
+    region: ${MEDIA_REGION:us-east-1}
+    bucket: ${MEDIA_BUCKET:ecommerce-media}
+    access-key: ${MEDIA_ACCESS_KEY:}
+    secret-key: ${MEDIA_SECRET_KEY:}
+    public-url: ${MEDIA_PUBLIC_URL:http://localhost:8333/ecommerce-media}
+    # Creates the bucket and its public-read policy at startup: development only, false in production.
+    provision: ${MEDIA_PROVISION:true}
 
 springdoc:
   api-docs:

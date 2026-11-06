@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.kmgtechnologies</groupId>
     <artifactId>ecommerce</artifactId>
-    <version>1.2.0</version>
+    <version>2.0.0</version>
     <name>ecommerce</name>
     <description>ecommerce</description>
     <properties>
@@ -23,7 +23,23 @@
         <!-- Logback appender for OTLP logs; not managed by Spring Boot. Must match the OpenTelemetry SDK that Spring Boot
              manages (opentelemetry.version 1.62.0 pairs with instrumentation 2.28.0): update both together. -->
         <opentelemetry-instrumentation.version>2.28.0-alpha</opentelemetry-instrumentation.version>
+        <!-- Object storage client (S3 API: SeaweedFS in development, any S3 provider in production) -->
+        <aws-sdk.version>2.57.9</aws-sdk.version>
+        <!-- ImageIO plug-ins: WebP and CMYK JPEG decoding, which the JDK lacks -->
+        <twelvemonkeys.version>3.15.3</twelvemonkeys.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -67,6 +83,33 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+
+        <!-- Product images and avatars: object storage over the S3 API, synchronous Apache HTTP client only -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- HTTP client of s3 (Apache HttpClient 5; the 4.x client is deprecated), needed at compile time for its timeouts -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>apache5-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-jpeg</artifactId>
+            <version>${twelvemonkeys.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>${twelvemonkeys.version}</version>
         </dependency>
 
         <dependency>

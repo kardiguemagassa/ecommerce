@@ -1,0 +1,295 @@
+/*
+ * Comptoir look on top of keycloak.v2 (PatternFly 5): the same colours, type and shapes as the shop
+ * (frontend/src/app/theme.ts). PatternFly is restyled through its own CSS variables where it has one.
+ */
+
+@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/inter-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("../fonts/inter-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/inter-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: Manrope; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/manrope-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: Manrope; font-style: normal; font-weight: 800; font-display: swap; src: url("../fonts/manrope-latin-800-normal.woff2") format("woff2"); }
+
+:root {
+  --comptoir-petrol: #0e5a61;
+  --comptoir-petrol-dark: #08393e;
+  --comptoir-petrol-light: #e3eeef;
+  --comptoir-background: #f6f5f2;
+  --comptoir-ink: #1b1d1f;
+  --comptoir-muted: #5d615f;
+  --comptoir-line: #e4e2dc;
+  --comptoir-field: #cfccc4;
+  --comptoir-error: #a12c2c;
+  --comptoir-radius: 10px;
+
+  --pf-v5-global--FontFamily--text: Inter, system-ui, sans-serif;
+  --pf-v5-global--FontFamily--heading: Manrope, Inter, system-ui, sans-serif;
+  --pf-v5-global--FontFamily--sans-serif: Inter, system-ui, sans-serif;
+  --pf-v5-global--Color--100: var(--comptoir-ink);
+  --pf-v5-global--Color--200: var(--comptoir-muted);
+  --pf-v5-global--primary-color--100: var(--comptoir-petrol);
+  --pf-v5-global--primary-color--200: var(--comptoir-petrol-dark);
+  --pf-v5-global--link--Color: var(--comptoir-petrol);
+  --pf-v5-global--link--Color--hover: var(--comptoir-petrol-dark);
+  --pf-v5-global--danger-color--100: var(--comptoir-error);
+  --pf-v5-global--BorderColor--100: var(--comptoir-field);
+  --pf-v5-global--active-color--100: var(--comptoir-petrol);
+  --keycloak-card-top-color: transparent;
+}
+
+/* Page: the warm grey of the shop, no background picture. */
+.login-pf body,
+.pf-v5-c-login {
+  background: var(--comptoir-background);
+}
+
+.pf-v5-c-login {
+  --pf-v5-c-login--PaddingTop: 3.5rem;
+  --pf-v5-c-login--PaddingBottom: 2.5rem;
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--comptoir-ink);
+}
+
+.pf-v5-c-login__container {
+  grid-template-columns: minmax(0, 28rem);
+  justify-content: center;
+}
+
+/* Brand: the bag in a petrol square, then the name, as in the header of the shop. */
+.pf-v5-c-login__header {
+  margin-bottom: 1.75rem;
+}
+
+#kc-header-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font: 800 1.5rem/1.2 Manrope, Inter, sans-serif;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--comptoir-ink) !important;
+}
+
+#kc-header-wrapper::before {
+  content: "";
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--comptoir-radius);
+  background: var(--comptoir-petrol) url("../img/bag.svg") center / 1.375rem no-repeat;
+}
+
+/* Card */
+.pf-v5-c-login__main {
+  --pf-v5-c-login__main--BoxShadow: none;
+  --pf-v5-c-login__main--BackgroundColor: #fff;
+  border: 1px solid var(--comptoir-line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.pf-v5-c-login__main-header {
+  border-top: 0;
+  padding-top: 2rem;
+}
+
+#kc-page-title {
+  font-family: Manrope, Inter, sans-serif;
+  font-weight: 800;
+  font-size: 1.75rem;
+  letter-spacing: -0.02em;
+  color: var(--comptoir-ink);
+}
+
+/* Fields: 46 px high, rounded, petrol focus ring (visible for keyboard users). */
+.pf-v5-c-form__label-text {
+  font-weight: 600;
+  color: var(--comptoir-ink);
+}
+
+.pf-v5-c-form-control {
+  --pf-v5-c-form-control--PaddingTop: 0.6875rem;
+  --pf-v5-c-form-control--PaddingBottom: 0.6875rem;
+  --pf-v5-c-form-control--PaddingLeft: 0.875rem;
+  --pf-v5-c-form-control--FontSize: 0.9375rem;
+  --pf-v5-c-form-control--before--BorderTopColor: var(--comptoir-field);
+  --pf-v5-c-form-control--before--BorderRightColor: var(--comptoir-field);
+  --pf-v5-c-form-control--before--BorderBottomColor: var(--comptoir-field);
+  --pf-v5-c-form-control--before--BorderLeftColor: var(--comptoir-field);
+  --pf-v5-c-form-control--before--BorderBottomWidth: 1px; /* PatternFly draws the bottom edge with ::after */
+  --pf-v5-c-form-control--after--BorderBottomColor: transparent;
+  --pf-v5-c-form-control--hover--after--BorderBottomColor: transparent;
+  --pf-v5-c-form-control--focus--after--BorderBottomColor: transparent;
+  --pf-v5-c-form-control--m-error--after--BorderBottomColor: transparent;
+  border-radius: var(--comptoir-radius);
+  background: #fff;
+}
+
+.pf-v5-c-form-control::before {
+  border-radius: var(--comptoir-radius);
+}
+
+/* PatternFly's underline: the shop's fields have a plain border all around. */
+.pf-v5-c-form-control::after {
+  display: none;
+}
+
+.pf-v5-c-form-control:hover::before {
+  border-color: var(--comptoir-muted);
+}
+
+/* Focus: a 2 px petrol border and a light halo, around the whole field (eye button included). */
+.pf-v5-c-form-control > input:focus,
+.pf-v5-c-form-control > input:focus-visible {
+  outline: none;
+}
+
+.pf-v5-c-form-control:focus-within::before {
+  border: 2px solid var(--comptoir-petrol);
+}
+
+.pf-v5-c-form-control:focus-within,
+.pf-v5-c-input-group:focus-within {
+  box-shadow: 0 0 0 4px var(--comptoir-petrol-light);
+}
+
+.pf-v5-c-input-group .pf-v5-c-form-control:focus-within {
+  box-shadow: none;
+}
+
+.pf-v5-c-form-control.pf-m-error::before {
+  border: 2px solid var(--comptoir-error);
+}
+
+.pf-v5-c-helper-text__item.pf-m-error,
+.kc-feedback-text.pf-m-error {
+  color: var(--comptoir-error);
+}
+
+/* Password: the show/hide button inside the field, not a separate grey block. */
+.pf-v5-c-input-group {
+  border-radius: var(--comptoir-radius);
+}
+
+.pf-v5-c-input-group .pf-v5-c-input-group__item:has(.pf-v5-c-form-control) .pf-v5-c-form-control {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.pf-v5-c-input-group .pf-v5-c-input-group__item:has(.pf-v5-c-form-control) .pf-v5-c-form-control::before {
+  border-inline-end: 0;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control {
+  --pf-v5-c-button--m-control--BackgroundColor: #fff;
+  --pf-v5-c-button--m-control--Color: var(--comptoir-petrol);
+  --pf-v5-c-button--m-control--after--BorderTopColor: var(--comptoir-field);
+  --pf-v5-c-button--m-control--after--BorderRightColor: var(--comptoir-field);
+  --pf-v5-c-button--m-control--after--BorderBottomColor: var(--comptoir-field);
+  --pf-v5-c-button--m-control--after--BorderLeftColor: transparent;
+  --pf-v5-c-button--m-control--hover--after--BorderBottomColor: var(--comptoir-field);
+  border-start-end-radius: var(--comptoir-radius);
+  border-end-end-radius: var(--comptoir-radius);
+}
+
+.pf-v5-c-input-group .pf-v5-c-button.pf-m-control::after {
+  border-start-end-radius: var(--comptoir-radius);
+  border-end-end-radius: var(--comptoir-radius);
+}
+
+/* Remember me */
+.pf-v5-c-check__input {
+  accent-color: var(--comptoir-petrol);
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* Buttons: 48 px, petrol, the type of the shop's buttons. */
+.pf-v5-c-button {
+  --pf-v5-c-button--BorderRadius: var(--comptoir-radius);
+  --pf-v5-c-button--after--BorderRadius: var(--comptoir-radius);
+  --pf-v5-c-button--FontWeight: 600;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--comptoir-petrol);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--comptoir-petrol-dark);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--comptoir-petrol-dark);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--comptoir-petrol-dark);
+  --pf-v5-c-button--PaddingTop: 0.8125rem;
+  --pf-v5-c-button--PaddingBottom: 0.8125rem;
+  font-size: 1rem;
+}
+
+.pf-v5-c-button:focus-visible {
+  outline: 2px solid var(--comptoir-petrol);
+  outline-offset: 2px;
+}
+
+/* "or", then Google: an outlined white button. */
+.kc-login-divider {
+  color: var(--comptoir-muted);
+}
+
+#kc-social-providers .pf-v5-c-button.pf-m-tertiary {
+  --pf-v5-c-button--m-tertiary--Color: var(--comptoir-ink);
+  --pf-v5-c-button--m-tertiary--hover--Color: var(--comptoir-ink);
+  --pf-v5-c-button--m-tertiary--after--BorderColor: var(--comptoir-field);
+  --pf-v5-c-button--m-tertiary--hover--after--BorderColor: var(--comptoir-muted);
+  --pf-v5-c-button--PaddingTop: 0.75rem;
+  --pf-v5-c-button--PaddingBottom: 0.75rem;
+  justify-content: center !important;
+  gap: 0.625rem;
+  font-weight: 600;
+}
+
+/* Links under the form */
+#kc-registration,
+#kc-info-wrapper {
+  text-align: center;
+  color: var(--comptoir-muted);
+}
+
+#kc-registration a,
+.pf-v5-c-login a {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+#kc-registration a:hover,
+.pf-v5-c-login a:hover {
+  text-decoration: underline;
+}
+
+.comptoir-back {
+  margin: 0;
+  padding: 0.5rem 0 1.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.comptoir-back a::before {
+  content: "← " / "";
+}
+
+/* Alerts (wrong password...) in the colours of the shop's error toasts. */
+.pf-v5-c-alert.pf-m-danger {
+  --pf-v5-c-alert--BackgroundColor: #fbe9e7;
+  --pf-v5-c-alert--m-danger__title--Color: #9a2b12;
+  --pf-v5-c-alert--m-inline--BackgroundColor: #fbe9e7;
+  border-radius: var(--comptoir-radius);
+}
+
+/* Phones: the card takes the width. */
+@media (max-width: 575px) {
+  .pf-v5-c-login {
+    --pf-v5-c-login--PaddingTop: 1.75rem;
+  }
+
+  .pf-v5-c-login__container {
+    padding-inline: 1rem;
+  }
+}

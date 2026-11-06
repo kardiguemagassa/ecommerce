@@ -57,7 +57,11 @@ public class OpenApiConfig {
                                 "Invalid request: validation errors (detailed in `errors`), malformed body or unsupported parameter"))
                         .addResponses("NotFound", problemResponse("Resource not found"))
                         .addResponses("Conflict", problemResponse(
-                                "Business rule violation (duplicate, resource in use, insufficient stock, empty cart) or concurrent modification")));
+                                "Business rule violation (duplicate, resource in use, insufficient stock, empty cart) or concurrent modification"))
+                        .addResponses("ImageRejected", problemResponse(
+                                "Image refused: too heavy (413), not a JPEG, PNG or WebP image (415), damaged or too many pixels (422)"))
+                        .addResponses("StorageUnavailable", problemResponse(
+                                "Media storage unreachable: nothing was changed, retry later")));
     }
 
     /** Authorization code flow against the realm, as the browser reaches it (PKCE added by Swagger UI). */
@@ -80,6 +84,14 @@ public class OpenApiConfig {
                 .addProperty("status", new IntegerSchema().example(404))
                 .addProperty("detail", new StringSchema().example("Product with id 42 not found"))
                 .addProperty("instance", new StringSchema().example("/api/products/42"))
+                .addProperty("code", new StringSchema()
+                        .description("Stable error code for the front-end, when the status alone is ambiguous "
+                                + "(UNAUTHENTICATED, ACCESS_DENIED, IMAGE_TOO_LARGE, UNSUPPORTED_IMAGE, INVALID_IMAGE, "
+                                + "STORAGE_UNAVAILABLE)")
+                        .example("UNSUPPORTED_IMAGE"))
+                .addProperty("traceId", new StringSchema()
+                        .description("Trace of the request, to quote to the support")
+                        .example("4bf92f3577b34da6a3ce929d0e0e4736"))
                 .addProperty("errors", new ObjectSchema()
                         .description("Field validation errors, keyed by field name (400 only)")
                         .example(java.util.Map.of("price", "must be greater than 0")));

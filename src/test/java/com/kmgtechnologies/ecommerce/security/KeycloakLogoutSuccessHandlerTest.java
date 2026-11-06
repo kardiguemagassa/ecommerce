@@ -20,7 +20,8 @@ class KeycloakLogoutSuccessHandlerTest {
 
     private static final BffProperties BFF = new BffProperties(
             URI.create("http://localhost:8080/api/me/session"),
-            URI.create("http://localhost:8180/realms/ecommerce/protocol/openid-connect/logout"));
+            URI.create("http://localhost:8180/realms/ecommerce/protocol/openid-connect/logout"),
+            URI.create("http://localhost:8180/realms/ecommerce/account"));
 
     private final KeycloakLogoutSuccessHandler handler = new KeycloakLogoutSuccessHandler(BFF);
 
@@ -43,8 +44,24 @@ class KeycloakLogoutSuccessHandlerTest {
 
     @Test
     void withoutBrowserSessionTheFrontEndIsTheOnlyPlaceToGo() {
-        assertThat(handler.logoutUrl(null)).isEqualTo("http://localhost:8080/api/me/session");
-        assertThat(handler.logoutUrl(new TestingAuthenticationToken("api-client", null))).isEqualTo(
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        assertThat(handler.logoutUrl(request, null)).isEqualTo("http://localhost:8080/api/me/session");
+        assertThat(handler.logoutUrl(request, new TestingAuthenticationToken("api-client", null))).isEqualTo(
                 "http://localhost:8080/api/me/session");
+    }
+
+    @Test
+    void relativeFrontEnd_isResolvedAgainstTheAddressTheBrowserUsed() {
+        KeycloakLogoutSuccessHandler relative = new KeycloakLogoutSuccessHandler(new BffProperties(URI.create("/"),
+                URI.create("http://localhost:8180/realms/ecommerce/protocol/openid-connect/logout"), BFF.accountUri()));
+        MockHttpServletRequest throughNginx = new MockHttpServletRequest("POST", "/logout");
+        throughNginx.setServerName("localhost");
+        throughNginx.setServerPort(8080);
+        MockHttpServletRequest throughVite = new MockHttpServletRequest("POST", "/logout");
+        throughVite.setServerName("localhost");
+        throughVite.setServerPort(5173);
+
+        assertThat(relative.logoutUrl(throughNginx, null)).isEqualTo("http://localhost:8080/");
+        assertThat(relative.logoutUrl(throughVite, null)).isEqualTo("http://localhost:5173/");
     }
 }

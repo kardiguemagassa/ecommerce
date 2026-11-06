@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # Smoke test of the running Compose stack (docker compose --profile app up -d --wait), run by CI and by hand:
-# real Keycloak tokens against the API, then the observability pipeline end to end.
+# everything through the web entry point (nginx on http://localhost:8080), as a browser would, with real Keycloak
+# tokens, then the observability pipeline end to end.
 #   1. Keycloak serves the "ecommerce" realm; the API refuses anonymous (401) and under-privileged (403) calls
 #   2. the shop administrator creates a product, the customer alice@example.com orders it through /api/me
-#   3. the browser login of the BFF: Keycloak login form, session cookie, CSRF on writes, logout at Keycloak
-#   4. an error response carries the id of its trace
-#   5. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
-#   6. the confirmation log lines of that trace reach Loki
+#   3. the browser login of the BFF: Keycloak login form, back on the front-end, session cookie, CSRF on writes,
+#      logout at Keycloak
+#   4. images: product image and avatar uploaded, re-encoded as JPEG, served read-only under /media, deleted
+#   5. the web entry point: front-end routes, security headers
+#   6. an error response carries the id of its trace
+#   7. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
+#   8. the confirmation log lines of that trace reach Loki
+#   9. image uploads are rate limited (429): last, not to slow the other checks down
 # Tokens of the demo users come from scripts/dev-token.sh (password grant on a development-only client).
 # Grafana's data source proxy is used for Tempo and Loki (admin/admin, development backend only).
 set -euo pipefail
@@ -19,7 +24,8 @@ setting() {
   printf '%s' "$value"
 }
 
-API=${API_URL:-http://localhost:8080/api}
+BASE=${BASE_URL:-http://localhost:8080}
+API=$BASE/api
 GRAFANA=${GRAFANA_URL:-http://admin:admin@localhost:3000}/api/datasources/proxy/uid
 KEYCLOAK=${KEYCLOAK_URL:-http://localhost:${KEYCLOAK_PORT:-8180}}
 ATTEMPTS=${ATTEMPTS:-30}
@@ -78,22 +84,36 @@ expect "$response" 201 "order placed"
 order=$(body "$response" | json "['id']")
 echo "OK  customer profile from the token, order $order placed through /api/me"
 
+# --- Customer support (administrators) ---------------------------------------------------------------------------
+response=$(call GET "/admin/customers?q=${CUSTOMER%%@*}" "$ADMIN")
+expect "$response" 200 "customer search by the administrator"
+customer=$(body "$response" | json "['content'][0]['id']")
+[ "$(body "$response" | json "['content'][0]['email']")" = "$CUSTOMER" ] || fail "customer search: $CUSTOMER not found"
+response=$(call GET "/admin/customers/$customer/orders" "$ADMIN")
+expect "$response" 200 "orders of the customer"
+[ "$(body "$response" | json "['content'][0]['id']")" = "$order" ] || fail "orders of the customer: latest is not order $order"
+expect "$(call GET /admin/customers "$ALICE")" 403 "customer search by a customer"
+echo "OK  customer support: $CUSTOMER found by the administrator with order $order on top, 403 for a customer"
+
 # --- Browser login through the API (BFF), as a browser would do it ----------------------------------------------
-BASE=${API%/api}
 jar=$(mktemp)
-trap 'rm -f "$jar"' EXIT
+image=$(mktemp)
+trap 'rm -f "$jar" "$image"' EXIT
 browser() { curl -sS -c "$jar" -b "$jar" "$@"; }
 form_action() { python3 -c "import html, re, sys; m = re.search(r'action=\"([^\"]+)\"', sys.stdin.read()); print(html.unescape(m.group(1)) if m else '')"; }
 
 action=$(browser -L "$BASE/oauth2/authorization/keycloak" | form_action)
 [ -n "$action" ] || fail "BFF login: no Keycloak login form"
-session=$(browser -L --data-urlencode "username=$CUSTOMER" --data-urlencode "password=$(setting DEMO_USER_PASSWORD)" "$action")
+landing=$(browser -L -o /dev/null -w '%{url_effective}' --data-urlencode "username=$CUSTOMER" \
+  --data-urlencode "password=$(setting DEMO_USER_PASSWORD)" "$action")
+[ "$landing" = "$BASE/" ] || fail "BFF login: landed on $landing instead of the front-end $BASE/"
+session=$(browser "$API/me/session")
 [ "$(json "['authenticated']" <<< "$session")" = True ] || fail "BFF login: not signed in after the login form: $session"
 [ "$(json "['email']" <<< "$session")" = "$CUSTOMER" ] || fail "BFF login: session of another user: $session"
 grep -q 'JSESSIONID' "$jar" || fail "BFF login: no session cookie"
 xsrf=$(awk '$6 == "XSRF-TOKEN" { print $7 }' "$jar" | tail -1)
 [ -n "$xsrf" ] || fail "BFF login: no XSRF-TOKEN cookie"
-echo "OK  BFF login of $CUSTOMER: Keycloak form, session cookie, no token in the browser"
+echo "OK  BFF login of $CUSTOMER: Keycloak form, back on the front-end, session cookie, no token in the browser"
 
 item="{\"productId\":$product,\"quantity\":1}"
 code=$(browser -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d "$item" "$API/me/cart/items")
@@ -103,6 +123,20 @@ code=$(browser -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: applicat
 [ "$code" = 200 ] || fail "BFF session write with CSRF token: HTTP $code instead of 200"
 echo "OK  session writes need the CSRF token (403 without, 200 with)"
 
+quantity=$(browser -X PUT -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $xsrf" -d '{"quantity":3}' \
+  "$API/me/cart/items/$product" | json "['totalQuantity']")
+[ "$quantity" = 3 ] || fail "cart quantity change: $quantity items instead of 3"
+code=$(browser -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $xsrf" \
+  -d '{"quantity":11}' "$API/me/cart/items/$product")
+[ "$code" = 409 ] || fail "cart quantity above stock: HTTP $code instead of 409"
+code=$(browser -o /dev/null -w '%{http_code}' -X DELETE -H "X-XSRF-TOKEN: $xsrf" "$API/me/cart")
+[ "$code" = 204 ] || fail "cart cleared: HTTP $code instead of 204"
+case "$(browser "$API/me/session" | json "['accountUrl']")" in
+  "$KEYCLOAK"/realms/ecommerce/account) ;;
+  *) fail "session: no Keycloak account console link" ;;
+esac
+echo "OK  cart quantity set (200, 409 above stock), cart cleared, account console link in the session"
+
 logout=$(browser -X POST -H "X-XSRF-TOKEN: $xsrf" "$BASE/logout")
 case "$(json "['logoutUrl']" <<< "$logout")" in
   "$KEYCLOAK"/realms/ecommerce/protocol/openid-connect/logout\?*id_token_hint=*) ;;
@@ -110,6 +144,52 @@ case "$(json "['logoutUrl']" <<< "$logout")" in
 esac
 [ "$(browser "$API/me/session" | json "['authenticated']")" = False ] || fail "BFF logout: session still open"
 echo "OK  logout closes the session and points to the Keycloak end-session endpoint"
+
+# --- Images: uploaded through the API, read from the media storage ------------------------------------------------
+# upload PATH TOKEN FILE: multipart PUT, prints the body, then the HTTP status on the last line
+upload() { curl -sS -X PUT -w '\n%{http_code}' -H "Authorization: Bearer $2" -F "file=@$3" "$API$1"; }
+# A 800 x 400 PNG, written with the Python standard library.
+python3 -c "
+import struct, sys, zlib
+w, h = 800, 400
+rows = b''.join(b'\\x00' + bytes([200, 80, 40]) * w for _ in range(h))
+chunk = lambda kind, data: struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+sys.stdout.buffer.write(b'\\x89PNG\\r\\n\\x1a\\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+                       + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))" > "$image"
+
+response=$(upload "/products/$product/image" "$ALICE" "$image")
+expect "$response" 403 "product image uploaded by a customer"
+response=$(upload "/products/$product/image" "$ADMIN" "$image")
+expect "$response" 200 "product image uploaded by the administrator"
+image_url=$(body "$response" | json "['imageUrl']")
+[ "$(curl -fsS "$API/products/$product" | json "['imageUrl']")" = "$image_url" ] || fail "product read without its new image"
+case "$image_url" in /media/products/*.jpg) ;; *) fail "product image URL $image_url is not under /media" ;; esac
+content_type=$(curl -fsS -o /dev/null -w '%{content_type}' "$BASE$image_url") || fail "product image not served at $image_url"
+[ "$content_type" = image/jpeg ] || fail "product image served as $content_type instead of image/jpeg"
+code=$(curl -sS -o /dev/null -w '%{http_code}' -X PUT --data 'overwritten' "$BASE$image_url")
+case "$code" in 2*) fail "media writable without credentials: PUT $image_url answered $code" ;; esac
+echo "OK  product image stored and re-encoded as JPEG, served read-only at $image_url"
+
+echo 'not an image' > "$image.txt"
+response=$(upload /me/avatar "$ALICE" "$image.txt"); rm -f "$image.txt"
+expect "$response" 415 "text file sent as avatar"
+response=$(upload /me/avatar "$ALICE" "$image")
+expect "$response" 200 "avatar uploaded"
+avatar_url=$(body "$response" | json "['avatarUrl']")
+curl -fsS -o /dev/null "$BASE$avatar_url" || fail "avatar not served at $avatar_url"
+expect "$(call DELETE /me/avatar "$ALICE")" 204 "avatar deleted"
+code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE$avatar_url")
+[ "$code" != 200 ] || fail "deleted avatar still served at $avatar_url"
+[ "$(body "$(call GET /me "$ALICE")" | json "['avatarUrl']")" = None ] || fail "profile still has an avatar"
+echo "OK  avatar: other files refused (415), stored, then erased from the storage"
+
+# --- Web entry point: front-end routes and security headers -------------------------------------------------------
+headers=$(curl -fsS -D - -o /dev/null "$BASE/admin") || fail "front-end route /admin not served"
+grep -qi '^content-type: text/html' <<< "$headers" || fail "/admin is not the front-end page"
+grep -qi "^content-security-policy: default-src 'self'; script-src 'self'" <<< "$headers" || fail "front-end without its CSP"
+grep -qi '^x-content-type-options: nosniff' <<< "$headers" || fail "front-end without X-Content-Type-Options"
+grep -qi '^server: nginx/' <<< "$headers" && fail "nginx version disclosed"
+echo "OK  front-end routes served by nginx with CSP and security headers"
 
 # --- Observability -------------------------------------------------------------------------------------------------
 error_trace=$(body "$(call GET /categories/999999999 none)" | json ".get('traceId', '')")
@@ -151,3 +231,14 @@ for stream in json.load(sys.stdin)['data']['result']:
 done
 echo "$logs" | grep -q "Confirmation of order $order sent" || fail "no confirmation log of order $order in Loki"
 echo "OK  confirmation logs of order $order in Loki, same trace id"
+
+# --- Rate limit of image uploads (last: the window then stays full for a minute) --------------------------------
+echo 'not an image' > "$image"
+limited=""
+for _ in $(seq 1 15); do
+  response=$(upload /me/avatar "$ALICE" "$image")
+  if [ "$(status "$response")" = 429 ]; then limited=$(body "$response"); break; fi
+done
+[ -n "$limited" ] || fail "15 avatar uploads in a row were not rate limited"
+[ "$(json "['code']" <<< "$limited")" = RATE_LIMITED ] || fail "rate limit answer is not a RATE_LIMITED problem: $limited"
+echo "OK  image uploads rate limited by nginx (429 RATE_LIMITED)"

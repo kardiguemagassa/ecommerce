@@ -2,12 +2,14 @@ package com.kmgtechnologies.ecommerce.service;
 
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CartResponse;
+import com.kmgtechnologies.ecommerce.dto.UpdateCartItemRequest;
 import com.kmgtechnologies.ecommerce.entity.Cart;
 import com.kmgtechnologies.ecommerce.entity.Category;
 import com.kmgtechnologies.ecommerce.entity.Customer;
 import com.kmgtechnologies.ecommerce.entity.Product;
 import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
+import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CartRepository;
 import com.kmgtechnologies.ecommerce.repository.CustomerRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
@@ -43,6 +45,9 @@ class CartServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private MediaUrls mediaUrls;
 
     @InjectMocks
     private CartService cartService;
@@ -138,6 +143,50 @@ class CartServiceTest {
         assertThatThrownBy(() -> cartService.addItem(99L, new AddCartItemRequest(LAPTOP_ID, 1)))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Customer with id 99 not found");
+    }
+
+    @Test
+    void changeQuantity_setsTheQuantity_upOrDown() {
+        Cart cart = new Cart(alice);
+        cart.addItem(laptop, 5);
+        when(cartRepository.findWithItemsByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cart));
+
+        CartResponse response = cartService.changeQuantity(CUSTOMER_ID, LAPTOP_ID, new UpdateCartItemRequest(2));
+
+        assertThat(response.totalQuantity()).isEqualTo(2);
+        assertThat(response.total()).isEqualByComparingTo("1999.98");
+    }
+
+    @Test
+    void changeQuantity_rejectsAQuantityAboveStock_andKeepsTheLine() {
+        Cart cart = new Cart(alice);
+        cart.addItem(laptop, 2);
+        when(cartRepository.findWithItemsByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(cart));
+
+        assertThatThrownBy(() -> cartService.changeQuantity(CUSTOMER_ID, LAPTOP_ID, new UpdateCartItemRequest(11)))
+                .isInstanceOf(InsufficientStockException.class)
+                .hasMessage("Insufficient stock for 'Laptop': requested 11, available 10");
+        assertThat(cart.findItem(LAPTOP_ID)).get()
+                .satisfies(item -> assertThat(item.getQuantity()).isEqualTo(2));
+    }
+
+    @Test
+    void changeQuantity_throwsWhenProductIsNotInCart() {
+        when(cartRepository.findWithItemsByCustomerId(CUSTOMER_ID)).thenReturn(Optional.of(new Cart(alice)));
+
+        assertThatThrownBy(() -> cartService.changeQuantity(CUSTOMER_ID, LAPTOP_ID, new UpdateCartItemRequest(1)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Product 10 is not in the cart");
+    }
+
+    @Test
+    void changeQuantity_withoutCart_isNotInCart() {
+        when(cartRepository.findWithItemsByCustomerId(CUSTOMER_ID)).thenReturn(Optional.empty());
+        when(customerRepository.existsById(CUSTOMER_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> cartService.changeQuantity(CUSTOMER_ID, LAPTOP_ID, new UpdateCartItemRequest(1)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Product 10 is not in the cart");
     }
 
     @Test

@@ -5,6 +5,9 @@ import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.entity.Category;
 import com.kmgtechnologies.ecommerce.entity.Product;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
+import com.kmgtechnologies.ecommerce.media.ImageKind;
+import com.kmgtechnologies.ecommerce.media.MediaFiles;
+import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CategoryRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
 import org.junit.jupiter.api.Test;
@@ -15,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -36,6 +40,12 @@ class ProductServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private MediaFiles mediaFiles;
+
+    @Mock
+    private MediaUrls mediaUrls;
 
     @InjectMocks
     private ProductService productService;
@@ -64,7 +74,7 @@ class ProductServiceTest {
 
     @Test
     void findById_throwsWhenProductDoesNotExist() {
-        when(productRepository.findResponseById(99L)).thenReturn(Optional.empty());
+        when(productRepository.findRowById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.findById(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -119,20 +129,63 @@ class ProductServiceTest {
     }
 
     @Test
-    void delete_removesExistingProduct() {
-        when(productRepository.existsById(5L)).thenReturn(true);
+    void delete_removesExistingProduct_andItsImageOnceCommitted() {
+        Product product = productWithImage("products/laptop.jpg");
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
 
         productService.delete(5L);
 
-        verify(productRepository).deleteById(5L);
+        verify(productRepository).delete(product);
+        verify(mediaFiles).deleteAfterCommit("products/laptop.jpg");
     }
 
     @Test
     void delete_throwsWhenProductDoesNotExist() {
-        when(productRepository.existsById(99L)).thenReturn(false);
+        when(productRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.delete(99L))
                 .isInstanceOf(ResourceNotFoundException.class);
-        verify(productRepository, never()).deleteById(any());
+        verify(productRepository, never()).delete(any());
+    }
+
+    @Test
+    void replaceImage_storesTheNewImage_andDeletesThePreviousOneOnceCommitted() {
+        Product product = productWithImage("products/old.jpg");
+        MockMultipartFile file = new MockMultipartFile("file", "laptop.png", "image/png", new byte[]{1});
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
+        when(mediaFiles.store(ImageKind.PRODUCT, file)).thenReturn("products/new.jpg");
+        when(mediaUrls.of("products/new.jpg")).thenReturn("http://media.test/products/new.jpg");
+
+        ProductResponse response = productService.replaceImage(5L, file);
+
+        assertThat(product.getImageKey()).isEqualTo("products/new.jpg");
+        assertThat(response.imageUrl()).isEqualTo("http://media.test/products/new.jpg");
+        verify(mediaFiles).deleteAfterCommit("products/old.jpg");
+    }
+
+    @Test
+    void replaceImage_throwsWhenProductDoesNotExist_withoutStoringAnything() {
+        when(productRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.replaceImage(99L, new MockMultipartFile("file", new byte[]{1})))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(mediaFiles, never()).store(any(), any());
+    }
+
+    @Test
+    void deleteImage_removesTheReference_andTheObjectOnceCommitted() {
+        Product product = productWithImage("products/old.jpg");
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
+
+        productService.deleteImage(5L);
+
+        assertThat(product.getImageKey()).isNull();
+        verify(mediaFiles).deleteAfterCommit("products/old.jpg");
+    }
+
+    private static Product productWithImage(String imageKey) {
+        Product product = new Product("Laptop", null, new BigDecimal("999.99"), 10, new Category("Electronics"));
+        product.setImageKey(imageKey);
+        return product;
     }
 }

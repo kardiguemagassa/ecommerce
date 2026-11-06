@@ -2,12 +2,14 @@ package com.kmgtechnologies.ecommerce.service;
 
 import com.kmgtechnologies.ecommerce.dto.AddCartItemRequest;
 import com.kmgtechnologies.ecommerce.dto.CartResponse;
+import com.kmgtechnologies.ecommerce.dto.UpdateCartItemRequest;
 import com.kmgtechnologies.ecommerce.entity.Cart;
 import com.kmgtechnologies.ecommerce.entity.CartItem;
 import com.kmgtechnologies.ecommerce.entity.Customer;
 import com.kmgtechnologies.ecommerce.entity.Product;
 import com.kmgtechnologies.ecommerce.exception.InsufficientStockException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
+import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CartRepository;
 import com.kmgtechnologies.ecommerce.repository.CustomerRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
@@ -21,19 +23,22 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
+    private final MediaUrls mediaUrls;
 
     public CartService(CartRepository cartRepository,
                        CustomerRepository customerRepository,
-                       ProductRepository productRepository) {
+                       ProductRepository productRepository,
+                       MediaUrls mediaUrls) {
         this.cartRepository = cartRepository;
         this.customerRepository = customerRepository;
         this.productRepository = productRepository;
+        this.mediaUrls = mediaUrls;
     }
 
     public CartResponse getCart(Long customerId) {
         ensureCustomerExists(customerId);
         return cartRepository.findWithItemsByCustomerId(customerId)
-                .map(cart -> CartResponse.from(customerId, cart))
+                .map(cart -> CartResponse.from(customerId, cart, mediaUrls))
                 .orElseGet(() -> CartResponse.empty(customerId));
     }
 
@@ -51,26 +56,44 @@ public class CartService {
         }
 
         cart.addItem(product, request.quantity());
-        return CartResponse.from(customerId, cart);
+        return CartResponse.from(customerId, cart, mediaUrls);
+    }
+
+    @Transactional
+    public CartResponse changeQuantity(Long customerId, Long productId, UpdateCartItemRequest request) {
+        Cart cart = existingCart(customerId, productId);
+        CartItem line = cart.findItem(productId).orElseThrow(() -> notInCart(productId));
+        Product product = line.getProduct();
+        if (request.quantity() > product.getStock()) {
+            throw new InsufficientStockException(product.getName(), request.quantity(), product.getStock());
+        }
+
+        cart.changeQuantity(productId, request.quantity());
+        return CartResponse.from(customerId, cart, mediaUrls);
     }
 
     @Transactional
     public CartResponse removeItem(Long customerId, Long productId) {
-        Cart cart = cartRepository.findWithItemsByCustomerId(customerId)
-                .orElseThrow(() -> customerRepository.existsById(customerId)
-                        ? notInCart(productId)
-                        : new ResourceNotFoundException("Customer", customerId));
+        Cart cart = existingCart(customerId, productId);
 
         if (!cart.removeItem(productId)) {
             throw notInCart(productId);
         }
-        return CartResponse.from(customerId, cart);
+        return CartResponse.from(customerId, cart, mediaUrls);
     }
 
     @Transactional
     public void clear(Long customerId) {
         ensureCustomerExists(customerId);
         cartRepository.findWithItemsByCustomerId(customerId).ifPresent(Cart::clear);
+    }
+
+    /** The customer's cart; without one, the product is not in the cart (404), or the customer does not exist. */
+    private Cart existingCart(Long customerId, Long productId) {
+        return cartRepository.findWithItemsByCustomerId(customerId)
+                .orElseThrow(() -> customerRepository.existsById(customerId)
+                        ? notInCart(productId)
+                        : new ResourceNotFoundException("Customer", customerId));
     }
 
     private Cart createCart(Long customerId) {

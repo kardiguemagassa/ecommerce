@@ -1,6 +1,8 @@
 package com.kmgtechnologies.ecommerce.security;
 
+import com.kmgtechnologies.ecommerce.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.core.Authentication;
@@ -22,14 +24,23 @@ public class SessionController {
 
     static final String ROLE_PREFIX = "ROLE_";
 
+    private final CustomerService customerService;
+    private final BffProperties bff;
+
+    public SessionController(CustomerService customerService, BffProperties bff) {
+        this.customerService = customerService;
+        this.bff = bff;
+    }
+
     @Operation(summary = "The browser session",
             description = """
                     Public: answers `authenticated: false` without a session. Sign in by navigating to \
                     `/oauth2/authorization/keycloak`, sign out with `POST /logout` (CSRF header), then navigate to \
-                    the returned `logoutUrl`.""")
+                    the returned `logoutUrl`. `avatarUrl`: profile photo for the navigation bar, null without one. \
+                    `accountUrl`: the Keycloak account console (name, e-mail, password), null when signed out.""")
     @ApiResponse(responseCode = "200", description = "Session state, and the XSRF-TOKEN cookie")
     @GetMapping("/api/me/session")
-    public Session session(Authentication authentication, CsrfToken csrf) {
+    public Session session(Authentication authentication, @Parameter(hidden = true) CsrfToken csrf) {
         csrf.getToken(); // writes the XSRF-TOKEN cookie (tokens are generated lazily)
         if (authentication == null || !(authentication.getPrincipal() instanceof OidcUser user)) {
             return Session.ANONYMOUS;
@@ -40,11 +51,13 @@ public class SessionController {
                 .map(authority -> authority.substring(ROLE_PREFIX.length()))
                 .sorted()
                 .toList();
-        return new Session(true, user.getFullName(), user.getEmail(), roles);
+        return new Session(true, user.getFullName(), user.getEmail(), roles,
+                customerService.findAvatarUrl(user.getSubject()), bff.accountUri().toString());
     }
 
-    public record Session(boolean authenticated, String name, String email, List<String> roles) {
+    public record Session(boolean authenticated, String name, String email, List<String> roles, String avatarUrl,
+                          String accountUrl) {
 
-        static final Session ANONYMOUS = new Session(false, null, null, List.of());
+        static final Session ANONYMOUS = new Session(false, null, null, List.of(), null, null);
     }
 }
