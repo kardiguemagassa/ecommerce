@@ -13,7 +13,7 @@ test.beforeAll(async () => {
   await api.dispose();
 });
 
-test('an administrator creates a product with two views, and the shop shows them at once', async ({ page }) => {
+test('an administrator creates a product with two views, and the shop shows them at once, full screen too', async ({ page }) => {
   const name = `E2E Bouilloire ${RUN}`;
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/admin\/produits$/);
@@ -55,6 +55,17 @@ test('an administrator creates a product with two views, and the shop shows them
   await expect(views.getByRole('button', { name: 'Voir la vue 2 sur 2' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('img', { name: `Photo du produit ${name}, vue 2 sur 2` })).toBeVisible();
   await expectAccessible(page, 'the product page with its views');
+
+  // Full screen: the views one by one, then back on the page with Escape.
+  await page.getByRole('button', { name: 'Agrandir la vue 2 sur 2' }).click();
+  const zoom = page.getByRole('dialog', { name: `Photos du produit ${name}` });
+  await expect(zoom.getByText('2 / 2')).toBeVisible();
+  await zoom.getByRole('button', { name: 'Vue précédente' }).click();
+  await expect(zoom.getByText('1 / 2')).toBeVisible();
+  await expectAccessible(page, 'the full-screen views');
+  await page.keyboard.press('Escape');
+  await expect(zoom).toBeHidden();
+  await expect(views.getByRole('button', { name: 'Voir la vue 1 sur 2' })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('an administrator renames a category with the keyboard', async ({ page }) => {
