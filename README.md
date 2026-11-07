@@ -537,7 +537,12 @@ stack in the `e2e` job, the HTML report and traces kept 7 days as an artifact wh
 the categories named `E2E …`, `Smoke …` (and `OTel …`, from earlier smoke tests) leave the database with their
 products, cart lines and orders, so a development catalogue keeps only its own data. An ordered product cannot be
 deleted through the API, hence SQL, in one transaction refused as a whole if an order mixes test and real products.
-`KEEP_TEST_DATA=1` keeps the data to look at it after a run; the script can also be run by hand.
+`KEEP_TEST_DATA=1` keeps the data to look at it after a run; the script can also be run by hand. The images of the
+deleted products leave the media storage with them.
+
+**Orphan images.** `./scripts/clean-orphan-media.py` lists the images of the storage that no product and no customer
+uses (rows deleted without the API, an image the storage could not remove); `--delete` removes them. Images younger
+than one hour are left alone (an upload in progress). Development only: it talks to SeaweedFS in its container.
 
 ## Known limitations and next steps
 

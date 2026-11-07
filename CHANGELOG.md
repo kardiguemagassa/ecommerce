@@ -4,6 +4,22 @@ Notable changes of each release. The format follows [Keep a Changelog](https://k
 versions [Semantic Versioning](https://semver.org/). Each release publishes two images on Docker Hub:
 `kardigue/ecommerce-api` and `kardigue/ecommerce-web`.
 
+## [Unreleased]
+
+### Changed
+
+- Keycloak 26.8.2 and minor updates of the front-end dependencies (TanStack Query, React Router, Vite plugin,
+  ESLint, Vitest). Dependabot no longer offers Node.js and TypeScript majors nor the nginx mainline: they are taken
+  by hand.
+
+### Fixed
+
+- Keycloak runs under a small init (`init: true`): stop signals are passed on and leftover processes reaped, so
+  `docker compose down` no longer hangs on it.
+- `scripts/clean-test-data.sh` also removes the images of the test products it deletes; new
+  `scripts/clean-orphan-media.py` lists (and with `--delete` removes) images no row uses any more.
+- Front-end tests no longer print "Not implemented: window.scrollTo" (mocked in the test setup).
+
 ## [2.0.1] - 2026-11-06
 
 ### Fixed
@@ -86,6 +102,7 @@ the stack changes shape: the API is no longer published on its own port, everyth
 - Actuator and business metrics on a dedicated management port, Prometheus and Grafana.
 - Unit, slice and integration tests, JaCoCo coverage.
 
+[Unreleased]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.1...dev
 [2.0.1]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/kardiguemagassa/ecommerce/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/kardiguemagassa/ecommerce/compare/v1.1.0...v1.2.0
