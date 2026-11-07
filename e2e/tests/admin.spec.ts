@@ -34,7 +34,7 @@ test('an administrator creates a product with two views, and the shop shows them
   await expect(editing.getByRole('img', { name: 'Vue 1' })).toBeVisible();
   await addView.setInputFiles(pngFile('bouilloire-dos.png', 600, 800));
   await expect(editing.getByRole('img', { name: 'Vue 2' })).toBeVisible();
-  await expect(editing.getByText('Principale')).toBeVisible();
+  await expect(editing.getByText('Principale', { exact: true })).toBeVisible();
   await expect(editing.getByText(/^2 sur 4/)).toBeVisible();
   await editing.getByRole('button', { name: 'Fermer' }).click();
 
