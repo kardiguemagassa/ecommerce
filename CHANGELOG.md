@@ -11,6 +11,9 @@ versions [Semantic Versioning](https://semver.org/). Each release publishes two 
 - **Up to four views per product.** The product page shows them with thumbnails (keyboard arrows, swiped on a phone);
   the catalogue, the cart and the best sellers keep the main image, the first view. In the admin space, views are
   added (dropped or chosen, several at once), moved before or after each other, removed after a confirmation.
+- **Full-screen views.** A click on the picture of a product page, or its magnifier button, shows the views full
+  screen: arrows (buttons, keyboard, a swipe), zoom ×2 (double click or tap, "+" and "−", the button) following the
+  pointer, Escape to close and back on the view last seen.
 - API: `POST /api/products/{id}/images` (409 `IMAGE_LIMIT` beyond four), `DELETE /api/products/{id}/images/{imageId}`,
   `PUT /api/products/{id}/images/order`; `images` in the product details. Migration `V5`: each existing image
   becomes the main view, nothing to upload again.
