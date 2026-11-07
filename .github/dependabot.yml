@@ -27,6 +27,15 @@ updates:
     target-branch: dev
     schedule:
       interval: weekly
+    ignore:
+      # The types follow the Node.js that runs the code (frontend/.nvmrc, e2e/.nvmrc, frontend/Dockerfile): a new
+      # major moves with Node itself, in one change, by hand.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # TypeScript 7 is a new compiler (native port): typescript-eslint, openapi-typescript and the Vite type checks
+      # have to follow first. Its own migration, by hand.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
@@ -41,6 +50,14 @@ updates:
     target-branch: dev
     schedule:
       interval: weekly
+    ignore:
+      # Node.js majors move with .nvmrc, CI and @types/node, in one change, by hand: never the build image alone.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+      # nginx stable branch only (even minor, 1.30.x): its security fixes come as patches. Odd minors (1.31) are
+      # the mainline; the next stable (1.32) is taken by hand.
+      - dependency-name: nginx/nginx-unprivileged
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
   # Images run by compose.yml (PostgreSQL, grafana/otel-lgtm)
   - package-ecosystem: docker-compose
     directory: /

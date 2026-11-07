@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { clearToasts } from '../app/notifications';
 import { server } from './server';
 
@@ -13,6 +13,10 @@ Blob.prototype.stream ??= function stream(this: Blob) {
     },
   });
 };
+
+// jsdom has no window.scrollTo, which React Router calls after each navigation (scroll restoration): a mock, instead
+// of "Not implemented" printed by every page test.
+Object.defineProperty(window, 'scrollTo', { value: vi.fn(), writable: true });
 
 // findBy* and waitFor wait 1 s by default: too short for a first render on a slower machine.
 configure({ asyncUtilTimeout: 5_000 });
