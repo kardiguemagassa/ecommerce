@@ -207,7 +207,7 @@ export const fr = {
     image: {
       title: 'Image',
       drop: 'Glissez une image ici ou cliquez pour choisir',
-      hint: 'JPEG, PNG ou WebP · 2 Mo maximum · recadrée en 4:3',
+      hint: 'JPEG, PNG ou WebP · 2 Mo maximum · affichée en entier, jamais recadrée',
       choose: 'Choisir une image',
       remove: "Retirer l'image",
       saved: 'Image enregistrée',

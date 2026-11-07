@@ -14,7 +14,7 @@ import { ProductImage } from '../product/ProductImage';
 
 /**
  * Image of a product: dropped on the zone or chosen with the button (keyboard), checked here (type, 2 MB), sent at once.
- * The API crops it to 4:3 and strips its metadata; the answer replaces the product everywhere (table, shop).
+ * The API reduces it (whole, never cropped) and strips its metadata; the answer replaces the product everywhere (table, shop).
  */
 export function ImageDropzone({ product }: { product: Product }) {
   const replace = useReplaceProductImage();

@@ -131,7 +131,7 @@ public class ProductController {
     @Operation(summary = "Replace the image of a product",
             description = """
                     Multipart field `file`: JPEG, PNG or WebP, 2 MB at most (format read from the content). Stored as \
-                    a JPEG of 1200 x 900 at most (4:3, centred crop, never enlarged), without the metadata of the \
+                    a JPEG within 1200 x 900 (whole picture, proportions kept, never enlarged), without the metadata of the \
                     upload (EXIF, GPS). The previous image is deleted. Returns the product with its new `imageUrl`.""")
     @ApiResponse(responseCode = "200", description = "Image stored")
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)

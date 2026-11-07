@@ -5,8 +5,10 @@ import { fr } from '../i18n/fr';
 const TINTS = ['#E3EEEF', '#EDE6DA', '#E6E9F2', '#EFE3E0'];
 
 /**
- * Product image, 4:3 like the stored JPEG (1200 x 900 at most). Its box is sized before the image arrives (no layout
- * shift); below the fold it loads only when about to be seen. Without image, a neutral visual of the same size.
+ * Product image in a 4:3 box, the same for every product: cards line up, and the box is sized before the image arrives
+ * (no layout shift). The stored JPEG keeps the whole picture (within 1200 x 900), so it is fitted in, on white: a
+ * portrait product (a kettle) is never cut, a photo with another ratio gets thin white bands. Below the fold it loads
+ * only when about to be seen. Without image, a neutral visual of the same size.
  * `decorative`: next to the product's name (tables, cart lines), hidden from screen readers so it is not read twice.
  */
 export function ProductImage({ product, eager = false, decorative = false }: { product: { id?: number; name?: string; imageUrl?: string }; eager?: boolean; decorative?: boolean }) {
@@ -32,7 +34,7 @@ export function ProductImage({ product, eager = false, decorative = false }: { p
       height={900}
       loading={eager ? 'eager' : 'lazy'}
       decoding="async"
-      sx={{ aspectRatio: '4 / 3', width: '100%', height: 'auto', objectFit: 'cover', display: 'block', bgcolor: 'primary.light' }}
+      sx={{ aspectRatio: '4 / 3', width: '100%', height: 'auto', objectFit: 'contain', display: 'block', bgcolor: '#FFFFFF' }}
     />
   );
 }

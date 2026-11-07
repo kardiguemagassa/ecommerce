@@ -31,8 +31,9 @@ import java.util.Iterator;
  *       and WebP only;</li>
  *   <li>the dimensions are read from the header before decoding, and a picture of more than 40 megapixels is refused
  *       (decompression bomb: a small file that would need gigabytes of memory);</li>
- *   <li>the image is decoded, turned upright (EXIF orientation of phone pictures), cropped to the ratio of its use,
- *       reduced (never enlarged) and flattened on white;</li>
+ *   <li>the image is decoded, turned upright (EXIF orientation of phone pictures), cropped to a square for a profile
+ *       photo (a product image keeps its whole picture), reduced to the size of its use (never enlarged) and
+ *       flattened on white;</li>
  *   <li>it is encoded again as a fresh JPEG: EXIF data (GPS position, device), comments and any payload appended to
  *       the original file are gone.</li>
  * </ol>
@@ -66,7 +67,9 @@ public class ImageProcessor {
         String format = detectFormat(data);
         BufferedImage decoded = decode(data, format);
         BufferedImage upright = orient(decoded, "jpeg".equals(format) ? exifOrientation(data) : 1);
-        BufferedImage resized = cover(upright, kind.width(), kind.height());
+        BufferedImage resized = kind.cropped()
+                ? cover(upright, kind.width(), kind.height())
+                : contain(upright, kind.width(), kind.height());
         return new ProcessedImage(encode(resized), resized.getWidth(), resized.getHeight(), format);
     }
 
@@ -202,7 +205,7 @@ public class ImageProcessor {
 
     /**
      * Centre crop to the ratio of {@code maxWidth x maxHeight}, then reduction to that size at most, on a white
-     * background (transparent PNG and WebP). Reduced by halves first: one bicubic pass from a large photo aliases.
+     * background (transparent PNG and WebP).
      */
     static BufferedImage cover(BufferedImage source, int maxWidth, int maxHeight) {
         double ratio = (double) maxWidth / maxHeight;
@@ -218,8 +221,29 @@ public class ImageProcessor {
         int targetWidth = Math.min(maxWidth, cropWidth);
         int targetHeight = Math.max(1, Math.min(maxHeight, (int) Math.round(targetWidth / ratio)));
 
-        BufferedImage current = draw(source, (sourceWidth - cropWidth) / 2, (sourceHeight - cropHeight) / 2,
+        BufferedImage cropped = draw(source, (sourceWidth - cropWidth) / 2, (sourceHeight - cropHeight) / 2,
                 cropWidth, cropHeight, cropWidth, cropHeight);
+        return reduce(cropped, targetWidth, targetHeight);
+    }
+
+    /**
+     * The whole picture, reduced to fit within {@code maxWidth x maxHeight} with its own proportions (never enlarged,
+     * nothing cut), on a white background (transparent PNG and WebP).
+     */
+    static BufferedImage contain(BufferedImage source, int maxWidth, int maxHeight) {
+        int sourceWidth = source.getWidth();
+        int sourceHeight = source.getHeight();
+        double scale = Math.min(1.0, Math.min((double) maxWidth / sourceWidth, (double) maxHeight / sourceHeight));
+        int targetWidth = Math.max(1, (int) Math.round(sourceWidth * scale));
+        int targetHeight = Math.max(1, (int) Math.round(sourceHeight * scale));
+
+        BufferedImage flattened = draw(source, 0, 0, sourceWidth, sourceHeight, sourceWidth, sourceHeight);
+        return reduce(flattened, targetWidth, targetHeight);
+    }
+
+    /** Reduction to the target size, by halves first: one bicubic pass from a large photo aliases. */
+    private static BufferedImage reduce(BufferedImage source, int targetWidth, int targetHeight) {
+        BufferedImage current = source;
         while (current.getWidth() / 2 >= targetWidth && current.getHeight() / 2 >= targetHeight) {
             current = draw(current, 0, 0, current.getWidth(), current.getHeight(),
                     current.getWidth() / 2, current.getHeight() / 2);
