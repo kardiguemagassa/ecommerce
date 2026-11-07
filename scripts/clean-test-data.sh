@@ -35,7 +35,11 @@ END $$;
 SELECT 'summary|' || format('%s categories, %s products, %s orders',
               (SELECT count(*) FROM test_categories), (SELECT count(*) FROM test_products),
               (SELECT count(*) FROM touched_orders));
-SELECT 'image|' || image_key FROM products WHERE id IN (SELECT id FROM test_products) AND image_key IS NOT NULL;
+-- Every view of the products (the main image is one of them, its key copied in products.image_key).
+SELECT DISTINCT 'image|' || image_key FROM (
+  SELECT image_key FROM product_images WHERE product_id IN (SELECT id FROM test_products)
+  UNION SELECT image_key FROM products WHERE id IN (SELECT id FROM test_products) AND image_key IS NOT NULL
+) AS keys;
 DELETE FROM cart_items  WHERE product_id IN (SELECT id FROM test_products);
 DELETE FROM order_items WHERE product_id IN (SELECT id FROM test_products);
 DELETE FROM orders      WHERE id IN (SELECT id FROM touched_orders);

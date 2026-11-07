@@ -6,7 +6,7 @@
 resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
 resolver_timeout 5s;
 
-# Image uploads: 10 per minute per client, bursts of 5 (avatar and product image).
+# Image uploads: 10 per minute per client, bursts of 5 (avatar, views of a product).
 limit_req_zone $binary_remote_addr zone=uploads:10m rate=10r/m;
 limit_req_status 429;
 limit_req_log_level warn;
@@ -82,7 +82,7 @@ server {
         proxy_pass $api;
     }
 
-    location ~ ^/api/(me/avatar|products/[0-9]+/image)$ {
+    location ~ ^/api/(me/avatar|products/[0-9]+/images?)$ {
         limit_req zone=uploads burst=5 nodelay;
         include /etc/nginx/snippets/security-headers.conf;
         include /etc/nginx/snippets/proxy.conf;

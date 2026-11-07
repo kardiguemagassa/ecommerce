@@ -363,6 +363,34 @@
         },
         "type": "object"
       },
+      "ProductImageOrderRequest": {
+        "properties": {
+          "imageIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "imageIds"
+        ],
+        "type": "object"
+      },
+      "ProductImageResponse": {
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ProductRequest": {
         "properties": {
           "categoryId": {
@@ -416,6 +444,12 @@
           },
           "imageUrl": {
             "type": "string"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ProductImageResponse"
+            },
+            "type": "array"
           },
           "name": {
             "type": "string"
@@ -1474,7 +1508,7 @@
     },
     "/api/products/{id}": {
       "delete": {
-        "description": "Evicts the cached product and deletes its image.",
+        "description": "Evicts the cached product and deletes its images.",
         "operationId": "delete",
         "parameters": [
           {
@@ -1590,6 +1624,8 @@
     },
     "/api/products/{id}/image": {
       "delete": {
+        "deprecated": true,
+        "description": "Kept for clients of 2.0: removes the first view, the next one becomes the main image. Prefer `DELETE /api/products/{id}/images/{imageId}`.",
         "operationId": "deleteImage",
         "parameters": [
           {
@@ -1610,13 +1646,14 @@
             "$ref": "#/components/responses/NotFound"
           }
         },
-        "summary": "Remove the image of a product",
+        "summary": "Remove the main image of a product",
         "tags": [
           "Products"
         ]
       },
       "put": {
-        "description": "Multipart field `file`: JPEG, PNG or WebP, 2 MB at most (format read from the content). Stored as a JPEG within 1200 x 900 (whole picture, proportions kept, never enlarged), without the metadata of the upload (EXIF, GPS). The previous image is deleted. Returns the product with its new `imageUrl`.",
+        "deprecated": true,
+        "description": "Kept for clients of 2.0: replaces the first view (adds it when the product has none). Prefer `POST /api/products/{id}/images`. Same rules for the file; the previous image is deleted.",
         "operationId": "replaceImage",
         "parameters": [
           {
@@ -1677,7 +1714,170 @@
             "$ref": "#/components/responses/StorageUnavailable"
           }
         },
-        "summary": "Replace the image of a product",
+        "summary": "Replace the main image of a product",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/products/{id}/images": {
+      "post": {
+        "description": "Multipart field `file`: JPEG, PNG or WebP, 2 MB at most (format read from the content). Stored as a JPEG within 1200 x 900 (whole picture, proportions kept, never enlarged), without the metadata of the upload (EXIF, GPS). Added after the other views; the first view is the main image. A product shows 4 views at most: 409 with code `IMAGE_LIMIT` beyond. Returns the product with its `images`.",
+        "operationId": "addImage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "View added"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/ImageRejected"
+          },
+          "415": {
+            "$ref": "#/components/responses/ImageRejected"
+          },
+          "422": {
+            "$ref": "#/components/responses/ImageRejected"
+          },
+          "503": {
+            "$ref": "#/components/responses/StorageUnavailable"
+          }
+        },
+        "summary": "Add a view of a product",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/products/{id}/images/order": {
+      "put": {
+        "description": "Lists the ids of all the views of the product, each once, in their new order; the first becomes the main image. Returns the product with its `images`.",
+        "operationId": "reorderImages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductImageOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "Views reordered"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Change the order of the views of a product",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/products/{id}/images/{imageId}": {
+      "delete": {
+        "description": "The image is deleted from the storage; the next views move up (the second becomes the main image when the first is removed). Returns the product with its `images`.",
+        "operationId": "removeImage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "imageId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "View removed"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Remove a view of a product",
         "tags": [
           "Products"
         ]

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -64,5 +64,34 @@ describe('Product page', () => {
     renderApp('/produits/abc');
 
     expect(await screen.findByRole('heading', { name: "Ce produit n'existe plus" })).toBeInTheDocument();
+  });
+
+  it('shows the views of a product: thumbnails, with the arrows of the keyboard', async () => {
+    const user = userEvent.setup();
+    const images = [1, 2, 3].map((id) => ({ id, url: `/media/products/lamp-${id}.jpg` }));
+    server.use(
+      http.get('*/api/products/13', () =>
+        HttpResponse.json({ id: 13, name: 'Lampe', price: 34.5, stock: 5, categoryId: 1, categoryName: 'Informatique', imageUrl: images[0]!.url, images }),
+      ),
+    );
+    renderApp('/produits/13');
+
+    expect(await screen.findByRole('img', { name: 'Photo du produit Lampe, vue 1 sur 3' })).toBeInTheDocument();
+    // Only the view on display is read: the others are hidden from screen readers.
+    expect(screen.queryByRole('img', { name: 'Photo du produit Lampe, vue 2 sur 3' })).not.toBeInTheDocument();
+    const thumbnails = screen.getByRole('group', { name: 'Vues du produit' });
+    expect(within(thumbnails).getAllByRole('button')).toHaveLength(3);
+    expect(within(thumbnails).getByRole('button', { name: 'Voir la vue 1 sur 3' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(within(thumbnails).getByRole('button', { name: 'Voir la vue 2 sur 3' }));
+    expect(within(thumbnails).getByRole('button', { name: 'Voir la vue 2 sur 3' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('img', { name: 'Photo du produit Lampe, vue 2 sur 3' })).toBeInTheDocument();
+
+    await user.keyboard('{ArrowRight}');
+    const third = within(thumbnails).getByRole('button', { name: 'Voir la vue 3 sur 3' });
+    expect(third).toHaveAttribute('aria-pressed', 'true');
+    expect(third).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(within(thumbnails).getByRole('button', { name: 'Voir la vue 1 sur 3' })).toHaveFocus();
   });
 });

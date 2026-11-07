@@ -3,8 +3,11 @@ package com.kmgtechnologies.ecommerce.controller;
 import com.kmgtechnologies.ecommerce.dto.TopSellingProductResponse;
 import com.kmgtechnologies.ecommerce.service.TopSellingProductService;
 import org.springframework.test.context.ActiveProfiles;
+import com.kmgtechnologies.ecommerce.dto.ProductImageOrderRequest;
+import com.kmgtechnologies.ecommerce.dto.ProductImageResponse;
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
+import com.kmgtechnologies.ecommerce.exception.ImageLimitException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.exception.UnsupportedImageException;
 import com.kmgtechnologies.ecommerce.service.ProductService;
@@ -52,7 +55,8 @@ class ProductControllerTest {
 
     private static final ProductResponse LAPTOP = new ProductResponse(
             1L, "Laptop", "15 inch", new BigDecimal("999.99"), 10, 2L, "Electronics",
-            "http://media.test/ecommerce-media/products/laptop.jpg");
+            "http://media.test/ecommerce-media/products/laptop.jpg",
+            List.of(new ProductImageResponse(10L, "http://media.test/ecommerce-media/products/laptop.jpg")));
 
     private static final MockMultipartFile IMAGE = new MockMultipartFile("file", "laptop.png", "image/png", new byte[]{1});
 
@@ -289,5 +293,70 @@ class ProductControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(productService).deleteImage(1L);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void addImage_returnsTheProductWithItsViews() throws Exception {
+        when(productService.addImage(eq(1L), any())).thenReturn(LAPTOP);
+
+        mockMvc.perform(multipart(HttpMethod.POST, "/api/products/1/images").file(IMAGE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.images[0].id").value(10))
+                .andExpect(jsonPath("$.images[0].url").value("http://media.test/ecommerce-media/products/laptop.jpg"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void addImage_returns409WithItsCode_beyondFourViews() throws Exception {
+        when(productService.addImage(eq(1L), any())).thenThrow(new ImageLimitException(4));
+
+        mockMvc.perform(multipart(HttpMethod.POST, "/api/products/1/images").file(IMAGE))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IMAGE_LIMIT"));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void addImage_isForbiddenToCustomers() throws Exception {
+        mockMvc.perform(multipart(HttpMethod.POST, "/api/products/1/images").file(IMAGE))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(productService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void removeImage_returnsTheProduct() throws Exception {
+        when(productService.removeImage(1L, 10L)).thenReturn(LAPTOP);
+
+        mockMvc.perform(delete("/api/products/1/images/10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void reorderImages_passesTheNewOrder() throws Exception {
+        when(productService.reorderImages(eq(1L), any())).thenReturn(LAPTOP);
+
+        mockMvc.perform(put("/api/products/1/images/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"imageIds\": [11, 10]}"))
+                .andExpect(status().isOk());
+
+        verify(productService).reorderImages(1L, new ProductImageOrderRequest(List.of(11L, 10L)));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void reorderImages_returns400WithoutIds() throws Exception {
+        mockMvc.perform(put("/api/products/1/images/order")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"imageIds\": []}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.imageIds").exists());
+
+        verifyNoInteractions(productService);
     }
 }

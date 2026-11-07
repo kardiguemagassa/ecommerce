@@ -6,7 +6,7 @@
 #   2. the shop administrator creates a product, the customer alice@example.com orders it through /api/me
 #   3. the browser login of the BFF: Keycloak login form, back on the front-end, session cookie, CSRF on writes,
 #      logout at Keycloak
-#   4. images: product image and avatar uploaded, re-encoded as JPEG, served read-only under /media, deleted
+#   4. images: a view of a product and an avatar uploaded, re-encoded as JPEG, served read-only under /media, deleted
 #   5. the web entry point: front-end routes, security headers
 #   6. an error response carries the id of its trace
 #   7. the order trace, read back from Tempo, holds the request, its SQL queries and the async confirmation
@@ -150,7 +150,7 @@ echo "OK  logout closes the session and points to the Keycloak end-session endpo
 
 # --- Images: uploaded through the API, read from the media storage ------------------------------------------------
 # upload PATH TOKEN FILE: multipart PUT, prints the body, then the HTTP status on the last line
-upload() { curl -sS -X PUT -w '\n%{http_code}' -H "Authorization: Bearer $2" -F "file=@$3" "$API$1"; }
+upload() { curl -sS -X "${METHOD:-PUT}" -w '\n%{http_code}' -H "Authorization: Bearer $2" -F "file=@$3" "$API$1"; }
 # A 800 x 400 PNG, written with the Python standard library.
 python3 -c "
 import struct, sys, zlib
@@ -160,18 +160,20 @@ chunk = lambda kind, data: struct.pack('>I', len(data)) + kind + data + struct.p
 sys.stdout.buffer.write(b'\\x89PNG\\r\\n\\x1a\\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
                        + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))" > "$image"
 
-response=$(upload "/products/$product/image" "$ALICE" "$image")
-expect "$response" 403 "product image uploaded by a customer"
-response=$(upload "/products/$product/image" "$ADMIN" "$image")
-expect "$response" 200 "product image uploaded by the administrator"
+response=$(METHOD=POST upload "/products/$product/images" "$ALICE" "$image")
+expect "$response" 403 "product view uploaded by a customer"
+response=$(METHOD=POST upload "/products/$product/images" "$ADMIN" "$image")
+expect "$response" 200 "product view uploaded by the administrator"
 image_url=$(body "$response" | json "['imageUrl']")
+[ "$(body "$response" | json "['images'][0]['url']")" = "$image_url" ] || fail "the first view is not the main image"
+[ "$(curl -fsS "$API/products/$product" | json "['images'].__len__()")" = 1 ] || fail "product details without their view"
 [ "$(curl -fsS "$API/products/$product" | json "['imageUrl']")" = "$image_url" ] || fail "product read without its new image"
 case "$image_url" in /media/products/*.jpg) ;; *) fail "product image URL $image_url is not under /media" ;; esac
 content_type=$(curl -fsS -o /dev/null -w '%{content_type}' "$BASE$image_url") || fail "product image not served at $image_url"
 [ "$content_type" = image/jpeg ] || fail "product image served as $content_type instead of image/jpeg"
 code=$(curl -sS -o /dev/null -w '%{http_code}' -X PUT --data 'overwritten' "$BASE$image_url")
 case "$code" in 2*) fail "media writable without credentials: PUT $image_url answered $code" ;; esac
-echo "OK  product image stored and re-encoded as JPEG, served read-only at $image_url"
+echo "OK  product view stored (main image) and re-encoded as JPEG, served read-only at $image_url"
 
 echo 'not an image' > "$image.txt"
 response=$(upload /me/avatar "$ALICE" "$image.txt"); rm -f "$image.txt"

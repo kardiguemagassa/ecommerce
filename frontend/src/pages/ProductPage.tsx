@@ -1,7 +1,6 @@
 import Box from '@mui/material/Box';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from '@mui/material/Link';
-import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import { useQuery } from '@tanstack/react-query';
@@ -12,7 +11,7 @@ import { catalogHref } from '../catalog/filters';
 import { fr } from '../i18n/fr';
 import { formatPrice } from '../i18n/format';
 import { AddToCartButton } from '../product/AddToCartButton';
-import { ProductImage } from '../product/ProductImage';
+import { ProductGallery } from '../product/ProductGallery';
 import { QuantityStepper } from '../product/QuantityStepper';
 import { StockLabel } from '../product/StockLabel';
 
@@ -42,9 +41,7 @@ export function ProductPage() {
       </Breadcrumbs>
 
       <Box sx={{ display: 'grid', gap: { xs: 3, md: 5 }, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, alignItems: 'start' }}>
-        <Paper variant="outlined" sx={{ borderRadius: 5, overflow: 'hidden' }}>
-          <ProductImage product={product} eager />
-        </Paper>
+        <ProductGallery product={product} />
 
         <Box sx={{ display: 'grid', gap: 2.25 }}>
           <Typography variant="overline" sx={{ justifySelf: 'start', lineHeight: 1, px: 1.25, py: 0.75, borderRadius: 1.5, bgcolor: 'primary.light', color: 'primary.main', fontWeight: 600 }}>

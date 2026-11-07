@@ -1,15 +1,18 @@
 package com.kmgtechnologies.ecommerce.service;
 
 import com.kmgtechnologies.ecommerce.config.CacheNames;
+import com.kmgtechnologies.ecommerce.dto.ProductImageOrderRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.entity.Category;
 import com.kmgtechnologies.ecommerce.entity.Product;
+import com.kmgtechnologies.ecommerce.entity.ProductImage;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.media.ImageKind;
 import com.kmgtechnologies.ecommerce.media.MediaFiles;
 import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CategoryRepository;
+import com.kmgtechnologies.ecommerce.repository.ProductImageRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -19,18 +22,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @Service
 @Transactional(readOnly = true)
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductImageRepository productImageRepository;
     private final CategoryRepository categoryRepository;
     private final MediaFiles mediaFiles;
     private final MediaUrls mediaUrls;
 
-    public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository,
-                          MediaFiles mediaFiles, MediaUrls mediaUrls) {
+    public ProductService(ProductRepository productRepository, ProductImageRepository productImageRepository,
+                          CategoryRepository categoryRepository, MediaFiles mediaFiles, MediaUrls mediaUrls) {
         this.productRepository = productRepository;
+        this.productImageRepository = productImageRepository;
         this.categoryRepository = categoryRepository;
         this.mediaFiles = mediaFiles;
         this.mediaUrls = mediaUrls;
@@ -45,7 +52,8 @@ public class ProductService {
     @Cacheable(cacheNames = CacheNames.PRODUCTS, key = "#id")
     public ProductResponse findById(Long id) {
         return productRepository.findRowById(id)
-                .map(row -> ProductResponse.from(row, mediaUrls))
+                .map(row -> ProductResponse.from(row, productImageRepository.findByProductIdOrderByDisplayOrderAsc(id),
+                        mediaUrls))
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
     }
 
@@ -79,28 +87,60 @@ public class ProductService {
     @CacheEvict(cacheNames = CacheNames.PRODUCTS, key = "#id")
     public void delete(Long id) {
         Product product = getProduct(id);
+        List<String> keys = product.getImages().stream().map(ProductImage::getImageKey).toList();
         productRepository.delete(product);
-        // Only if the deletion commits: a product still referenced by an order keeps its image.
-        mediaFiles.deleteAfterCommit(product.getImageKey());
+        // Only if the deletion commits: a product still referenced by an order keeps its images.
+        keys.forEach(mediaFiles::deleteAfterCommit);
     }
 
-    /** Replaces the image of the product; the previous one is deleted once the change is committed. */
+    /** A new view, after the others (the first view is the main image); 409 when the product has 4 already. */
+    @Transactional
+    @CacheEvict(cacheNames = CacheNames.PRODUCTS, key = "#id")
+    public ProductResponse addImage(Long id, MultipartFile file) {
+        Product product = getProduct(id);
+        product.requireRoomForImage(); // before the upload is processed and stored
+        // Saved at once: the answer carries the id of the new view (to remove it, to move it).
+        productImageRepository.save(product.addImage(mediaFiles.store(ImageKind.PRODUCT, file)));
+        return ProductResponse.from(product, mediaUrls);
+    }
+
+    /** Removes a view, deleted from the storage once committed; the next ones move up. */
+    @Transactional
+    @CacheEvict(cacheNames = CacheNames.PRODUCTS, key = "#id")
+    public ProductResponse removeImage(Long id, Long imageId) {
+        Product product = getProduct(id);
+        mediaFiles.deleteAfterCommit(product.removeImage(imageId));
+        return ProductResponse.from(product, mediaUrls);
+    }
+
+    /** The views in a new order; the first one becomes the main image. */
+    @Transactional
+    @CacheEvict(cacheNames = CacheNames.PRODUCTS, key = "#id")
+    public ProductResponse reorderImages(Long id, ProductImageOrderRequest request) {
+        Product product = getProduct(id);
+        product.reorderImages(request.imageIds());
+        return ProductResponse.from(product, mediaUrls);
+    }
+
+    /** Replaces the main image (added when there is none); the previous one is deleted once committed. */
     @Transactional
     @CacheEvict(cacheNames = CacheNames.PRODUCTS, key = "#id")
     public ProductResponse replaceImage(Long id, MultipartFile file) {
         Product product = getProduct(id);
-        String previous = product.getImageKey();
-        product.setImageKey(mediaFiles.store(ImageKind.PRODUCT, file));
-        mediaFiles.deleteAfterCommit(previous);
+        if (product.getImages().isEmpty()) {
+            productImageRepository.save(product.addImage(mediaFiles.store(ImageKind.PRODUCT, file)));
+        } else {
+            mediaFiles.deleteAfterCommit(product.replaceMainImage(mediaFiles.store(ImageKind.PRODUCT, file)));
+        }
         return ProductResponse.from(product, mediaUrls);
     }
 
+    /** Removes the main image; the next view becomes the main one. */
     @Transactional
     @CacheEvict(cacheNames = CacheNames.PRODUCTS, key = "#id")
     public void deleteImage(Long id) {
         Product product = getProduct(id);
-        mediaFiles.deleteAfterCommit(product.getImageKey());
-        product.setImageKey(null);
+        mediaFiles.deleteAfterCommit(product.removeMainImage());
     }
 
     private Product getProduct(Long id) {

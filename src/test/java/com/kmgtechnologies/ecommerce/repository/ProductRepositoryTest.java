@@ -130,7 +130,7 @@ class ProductRepositoryTest {
     void findRowById_returnsTheImageKey() {
         Product laptop = productRepository.findById(productRepository.search(null, "Laptop", FIRST_PAGE_BY_NAME)
                 .getContent().getFirst().id()).orElseThrow();
-        laptop.setImageKey("products/laptop.jpg");
+        laptop.addImage("products/laptop.jpg");
         entityManager.flush();
 
         assertThat(productRepository.findRowById(laptop.getId()))

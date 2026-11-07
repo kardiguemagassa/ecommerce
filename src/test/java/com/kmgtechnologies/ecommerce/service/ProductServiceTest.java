@@ -1,15 +1,20 @@
 package com.kmgtechnologies.ecommerce.service;
 
+import com.kmgtechnologies.ecommerce.dto.ProductImageOrderRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.entity.Category;
 import com.kmgtechnologies.ecommerce.entity.Product;
+import com.kmgtechnologies.ecommerce.entity.ProductImage;
+import com.kmgtechnologies.ecommerce.exception.ImageLimitException;
 import com.kmgtechnologies.ecommerce.exception.ResourceNotFoundException;
 import com.kmgtechnologies.ecommerce.media.ImageKind;
 import com.kmgtechnologies.ecommerce.media.MediaFiles;
 import com.kmgtechnologies.ecommerce.media.MediaUrls;
 import com.kmgtechnologies.ecommerce.repository.CategoryRepository;
+import com.kmgtechnologies.ecommerce.repository.ProductImageRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
+import com.kmgtechnologies.ecommerce.repository.ProductRow;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,12 +24,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,6 +45,9 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private ProductImageRepository productImageRepository;
 
     @Mock
     private CategoryRepository categoryRepository;
@@ -183,9 +194,104 @@ class ProductServiceTest {
         verify(mediaFiles).deleteAfterCommit("products/old.jpg");
     }
 
+    @Test
+    void replaceImage_ofAProductWithoutImage_addsItsFirstView() {
+        Product product = new Product("Laptop", null, new BigDecimal("999.99"), 10, new Category("Electronics"));
+        MockMultipartFile file = new MockMultipartFile("file", "laptop.png", "image/png", new byte[]{1});
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
+        when(mediaFiles.store(ImageKind.PRODUCT, file)).thenReturn("products/first.jpg");
+
+        productService.replaceImage(5L, file);
+
+        assertThat(product.getImages()).extracting(ProductImage::getImageKey).containsExactly("products/first.jpg");
+        verify(productImageRepository).save(any(ProductImage.class));
+        verify(mediaFiles, never()).deleteAfterCommit(any());
+    }
+
+    @Test
+    void findById_returnsTheViews_mainImageFirst() {
+        Product product = productWithImage("products/front.jpg");
+        ReflectionTestUtils.setField(product.addImage("products/back.jpg"), "id", 2L);
+        when(productRepository.findRowById(5L)).thenReturn(Optional.of(new ProductRow(
+                5L, "Laptop", null, new BigDecimal("999.99"), 10, 1L, "Electronics", "products/front.jpg")));
+        when(productImageRepository.findByProductIdOrderByDisplayOrderAsc(5L)).thenReturn(product.getImages());
+        when(mediaUrls.of(any())).thenAnswer(invocation -> "http://media.test/" + invocation.getArgument(0));
+
+        ProductResponse response = productService.findById(5L);
+
+        assertThat(response.imageUrl()).isEqualTo("http://media.test/products/front.jpg");
+        assertThat(response.images()).extracting("id", "url").containsExactly(
+                tuple(1L, "http://media.test/products/front.jpg"),
+                tuple(2L, "http://media.test/products/back.jpg"));
+    }
+
+    @Test
+    void addImage_storesTheUpload_andSavesTheNewView() {
+        Product product = productWithImage("products/front.jpg");
+        MockMultipartFile file = new MockMultipartFile("file", "side.png", "image/png", new byte[]{1});
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
+        when(mediaFiles.store(ImageKind.PRODUCT, file)).thenReturn("products/side.jpg");
+
+        productService.addImage(5L, file);
+
+        assertThat(product.getImages()).extracting(ProductImage::getImageKey)
+                .containsExactly("products/front.jpg", "products/side.jpg");
+        assertThat(product.getImageKey()).isEqualTo("products/front.jpg");
+        verify(productImageRepository).save(any(ProductImage.class));
+    }
+
+    @Test
+    void addImage_beyondFourViews_isRefusedBeforeAnythingIsStored() {
+        Product product = productWithImage("products/1.jpg");
+        product.addImage("products/2.jpg");
+        product.addImage("products/3.jpg");
+        product.addImage("products/4.jpg");
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
+
+        assertThatThrownBy(() -> productService.addImage(5L, new MockMultipartFile("file", new byte[]{1})))
+                .isInstanceOf(ImageLimitException.class);
+        verify(mediaFiles, never()).store(any(), any());
+    }
+
+    @Test
+    void removeImage_deletesTheObjectOnceCommitted() {
+        Product product = productWithImage("products/front.jpg");
+        ReflectionTestUtils.setField(product.addImage("products/back.jpg"), "id", 2L);
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
+
+        productService.removeImage(5L, 1L);
+
+        assertThat(product.getImageKey()).isEqualTo("products/back.jpg");
+        verify(mediaFiles).deleteAfterCommit("products/front.jpg");
+    }
+
+    @Test
+    void reorderImages_makesTheFirstGivenViewTheMainImage() {
+        Product product = productWithImage("products/front.jpg");
+        ReflectionTestUtils.setField(product.addImage("products/back.jpg"), "id", 2L);
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
+
+        productService.reorderImages(5L, new ProductImageOrderRequest(List.of(2L, 1L)));
+
+        assertThat(product.getImageKey()).isEqualTo("products/back.jpg");
+    }
+
+    @Test
+    void delete_removesAllTheViewsOnceCommitted() {
+        Product product = productWithImage("products/front.jpg");
+        product.addImage("products/back.jpg");
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
+
+        productService.delete(5L);
+
+        verify(mediaFiles).deleteAfterCommit("products/front.jpg");
+        verify(mediaFiles).deleteAfterCommit("products/back.jpg");
+    }
+
+    /** A product whose main image (id 1, as saved) has this key. */
     private static Product productWithImage(String imageKey) {
         Product product = new Product("Laptop", null, new BigDecimal("999.99"), 10, new Category("Electronics"));
-        product.setImageKey(imageKey);
+        ReflectionTestUtils.setField(product.addImage(imageKey), "id", 1L);
         return product;
     }
 }
