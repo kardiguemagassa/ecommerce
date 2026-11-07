@@ -4,6 +4,21 @@ Notable changes of each release. The format follows [Keep a Changelog](https://k
 versions [Semantic Versioning](https://semver.org/). Each release publishes two images on Docker Hub:
 `kardigue/ecommerce-api` and `kardigue/ecommerce-web`.
 
+## [2.1.0] - 2026-11-07
+
+### Added
+
+- **Up to four views per product.** The product page shows them with thumbnails (keyboard arrows, swiped on a phone);
+  the catalogue, the cart and the best sellers keep the main image, the first view. In the admin space, views are
+  added (dropped or chosen, several at once), moved before or after each other, removed after a confirmation.
+- API: `POST /api/products/{id}/images` (409 `IMAGE_LIMIT` beyond four), `DELETE /api/products/{id}/images/{imageId}`,
+  `PUT /api/products/{id}/images/order`; `images` in the product details. Migration `V5`: each existing image
+  becomes the main view, nothing to upload again.
+
+### Deprecated
+
+- `PUT` and `DELETE /api/products/{id}/image`: they still act on the main image; use the views endpoints.
+
 ## [2.0.2] - 2026-11-07
 
 ### Changed
@@ -102,6 +117,7 @@ the stack changes shape: the API is no longer published on its own port, everyth
 - Actuator and business metrics on a dedicated management port, Prometheus and Grafana.
 - Unit, slice and integration tests, JaCoCo coverage.
 
+[2.1.0]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/kardiguemagassa/ecommerce/compare/v1.2.0...v2.0.0

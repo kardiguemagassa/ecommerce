@@ -15,7 +15,7 @@ import { ApiError } from '../api/problem';
 import { notify } from '../app/notifications';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { fr } from '../i18n/fr';
-import { ImageDropzone } from './ImageDropzone';
+import { ProductImagesEditor } from './ProductImagesEditor';
 import {
   DESCRIPTION_MAX,
   NAME_MAX,
@@ -34,11 +34,11 @@ export type Editing = 'new' | number | undefined;
 interface ProductDrawerProps {
   editing: Editing;
   onClose: () => void;
-  /** A new product was created: the drawer goes on with it (its image can be added now). */
+  /** A new product was created: the drawer goes on with it (its images can be added now). */
   onCreated: (id: number) => void;
 }
 
-/** Side panel of the products table: the form, then the image once the product exists. */
+/** Side panel of the products table: the form, then the images once the product exists. */
 export function ProductDrawer({ editing, onClose, onCreated }: ProductDrawerProps) {
   // Kept up to date by the form: closing with unsaved changes asks first.
   const dirtyRef = useRef(false);
@@ -97,7 +97,7 @@ function ProductEditor({ editing, onClose, onDone, onCreated, dirtyRef }: Editor
         <ProductForm initial={emptyProduct} onCancel={onClose} onSaved={(saved) => onCreated(saved.id!)} dirtyRef={dirtyRef} />
       ) : product ? (
         <>
-          <ImageDropzone product={product} />
+          <ProductImagesEditor product={product} />
           <ProductForm product={product} initial={valuesOf(product)} onCancel={onClose} onSaved={onDone} dirtyRef={dirtyRef} />
         </>
       ) : (

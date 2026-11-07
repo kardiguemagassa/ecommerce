@@ -9,7 +9,7 @@ with it), or when the storage could not remove it. Orphans are never served (the
 take room.
 
 Objects are listed and removed through the file API of SeaweedFS, inside its container (docker compose exec media);
-the keys in use come from the database (products.image_key, customers.avatar_key). An object younger than one hour is
+the keys in use come from the database (product views, customers.avatar_key). An object younger than one hour is
 never touched: it may be an upload whose row is not committed yet. Stack running: docker compose up -d --wait.
 Python standard library only. Development only (the storage of another environment is not SeaweedFS).
 """
@@ -34,6 +34,7 @@ def compose(*args, stdin=None):
 
 def keys_in_use():
     sql = ("SELECT image_key FROM products WHERE image_key IS NOT NULL "
+           "UNION SELECT image_key FROM product_images "
            "UNION SELECT avatar_key FROM customers WHERE avatar_key IS NOT NULL")
     psql = 'psql -v ON_ERROR_STOP=1 -qAt -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
     out = compose("postgres", "sh", "-c", psql, stdin=sql)

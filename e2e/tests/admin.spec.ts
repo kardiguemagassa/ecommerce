@@ -1,6 +1,6 @@
 import { adminApi, createCategory, type Seeded } from '../support/api';
 import { ADMIN, CUSTOMER, RUN } from '../support/env';
-import { expect, test } from '../support/fixtures';
+import { expect, expectAccessible, test } from '../support/fixtures';
 import { pngFile } from '../support/png';
 
 test.use({ storageState: ADMIN.state });
@@ -13,7 +13,7 @@ test.beforeAll(async () => {
   await api.dispose();
 });
 
-test('an administrator creates a product with its image, and the shop shows it at once', async ({ page }) => {
+test('an administrator creates a product with two views, and the shop shows them at once', async ({ page }) => {
   const name = `E2E Bouilloire ${RUN}`;
   await page.goto('/admin');
   await expect(page).toHaveURL(/\/admin\/produits$/);
@@ -29,9 +29,13 @@ test('an administrator creates a product with its image, and the shop shows it a
 
   const editing = page.getByRole('dialog', { name: `Modifier « ${name} »` });
   await expect(editing).toBeVisible();
-  await editing.getByLabel('Choisir une image').setInputFiles(pngFile('bouilloire.png', 800, 600));
-  await expect(page.getByText('Image enregistrée')).toBeVisible();
-  await expect(editing.getByRole('button', { name: "Retirer l'image" })).toBeVisible();
+  const addView = editing.getByLabel('Ajouter une image');
+  await addView.setInputFiles(pngFile('bouilloire.png', 800, 600));
+  await expect(editing.getByRole('img', { name: 'Vue 1' })).toBeVisible();
+  await addView.setInputFiles(pngFile('bouilloire-dos.png', 600, 800));
+  await expect(editing.getByRole('img', { name: 'Vue 2' })).toBeVisible();
+  await expect(editing.getByText('Principale')).toBeVisible();
+  await expect(editing.getByText(/^2 sur 4/)).toBeVisible();
   await editing.getByRole('button', { name: 'Fermer' }).click();
 
   await page.goto(`/?q=${encodeURIComponent(name)}`);
@@ -41,6 +45,16 @@ test('an administrator creates a product with its image, and the shop shows it a
   await expect(image).toHaveJSProperty('complete', true);
   expect(await image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0); // really served
   await expect(page.getByText('39,00 €').first()).toBeVisible();
+
+  // The product page: the main image, a thumbnail for each view, the second one shown on demand.
+  await page.getByRole('link', { name }).first().click();
+  const views = page.getByRole('group', { name: 'Vues du produit' });
+  await expect(views.getByRole('button')).toHaveCount(2);
+  await expect(page.getByRole('img', { name: `Photo du produit ${name}, vue 1 sur 2` })).toBeVisible();
+  await views.getByRole('button', { name: 'Voir la vue 2 sur 2' }).click();
+  await expect(views.getByRole('button', { name: 'Voir la vue 2 sur 2' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('img', { name: `Photo du produit ${name}, vue 2 sur 2` })).toBeVisible();
+  await expectAccessible(page, 'the product page with its views');
 });
 
 test('an administrator renames a category with the keyboard', async ({ page }) => {

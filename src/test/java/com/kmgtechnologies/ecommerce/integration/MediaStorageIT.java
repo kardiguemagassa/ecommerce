@@ -1,6 +1,8 @@
 package com.kmgtechnologies.ecommerce.integration;
 
 import com.kmgtechnologies.ecommerce.dto.CustomerResponse;
+import com.kmgtechnologies.ecommerce.dto.ProductImageOrderRequest;
+import com.kmgtechnologies.ecommerce.dto.ProductImageResponse;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.entity.Category;
 import com.kmgtechnologies.ecommerce.entity.Product;
@@ -37,6 +39,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -138,6 +141,27 @@ class MediaStorageIT {
         productService.delete(product.getId());
 
         assertThat(get(url).statusCode()).isNotEqualTo(200);
+    }
+
+    @Test
+    void views_areAddedReorderedAndRemoved_theirObjectsDeletedWithThem() throws Exception {
+        ProductResponse front = productService.addImage(product.getId(), upload(400, 300));
+        ProductResponse both = productService.addImage(product.getId(), upload(300, 400));
+        Long frontId = both.images().get(0).id();
+        Long backId = both.images().get(1).id();
+        String frontUrl = both.images().get(0).url();
+        assertThat(front.imageUrl()).isEqualTo(frontUrl);
+        assertThat(productService.findById(product.getId()).images()).hasSize(2);
+
+        ProductResponse reordered = productService.reorderImages(product.getId(),
+                new ProductImageOrderRequest(List.of(backId, frontId)));
+        assertThat(reordered.imageUrl()).isEqualTo(both.images().get(1).url());
+        assertThat(productService.findById(product.getId()).images()).extracting(ProductImageResponse::id)
+                .containsExactly(backId, frontId);
+
+        ProductResponse removed = productService.removeImage(product.getId(), frontId);
+        assertThat(removed.images()).extracting(ProductImageResponse::id).containsExactly(backId);
+        assertThat(get(frontUrl).statusCode()).isNotEqualTo(200);
     }
 
     @Test
