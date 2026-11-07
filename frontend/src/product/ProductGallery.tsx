@@ -1,21 +1,25 @@
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Paper from '@mui/material/Paper';
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import type { Product } from '../api/catalog';
 import { fr } from '../i18n/fr';
 import { ProductImage } from './ProductImage';
 
+/** A swipe: the finger moved this far sideways (px) between down and up. */
+const SWIPE = 50;
+
 /**
- * The views of a product on its page. With one view (or none), the image alone, as before. With several, a strip that
- * slides from one view to the next (swiped on a phone, it snaps on each view) and thumbnails below: a thumbnail shows its
- * view; with the keyboard, the arrows go from thumbnail to thumbnail. Only the view on display is read by screen
+ * The views of a product on its page. With one view (or none), the image alone, as before. With several, the view on
+ * display slides to the next one (a swipe on a phone) and thumbnails below show each view; with the keyboard, the
+ * arrows go from thumbnail to thumbnail. No scrolling area: the strip moves by transform, so there is nothing for the
+ * keyboard to scroll (the thumbnails are its way through the views). Only the view on display is read by screen
  * readers; every view loads with the page (4 at most), so none appears blank while sliding.
  */
 export function ProductGallery({ product }: { product: Product }) {
   const views = product.images ?? [];
-  const track = useRef<HTMLDivElement>(null);
   const thumbnails = useRef<(HTMLButtonElement | null)[]>([]);
+  const swipe = useRef(0);
   const [current, setCurrent] = useState(0);
   const name = product.name ?? '';
 
@@ -28,20 +32,7 @@ export function ProductGallery({ product }: { product: Product }) {
   }
 
   const show = (index: number) => {
-    setCurrent(index);
-    const strip = track.current;
-    if (!strip) return;
-    const left = index * strip.clientWidth;
-    const calm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (typeof strip.scrollTo === 'function') strip.scrollTo({ left, behavior: calm ? 'auto' : 'smooth' });
-    else strip.scrollLeft = left;
-  };
-  // A swipe (or a trackpad) moved the strip: the thumbnails follow the view that settled.
-  const settled = () => {
-    const strip = track.current;
-    if (!strip?.clientWidth) return;
-    const index = Math.round(strip.scrollLeft / strip.clientWidth);
-    if (index !== current && index >= 0 && index < views.length) setCurrent(index);
+    if (index >= 0 && index < views.length) setCurrent(index);
   };
   const keys = (event: KeyboardEvent) => {
     const next = { ArrowRight: current + 1, ArrowLeft: current - 1, Home: 0, End: views.length - 1 }[event.key];
@@ -50,20 +41,27 @@ export function ProductGallery({ product }: { product: Product }) {
     show(next);
     thumbnails.current[next]?.focus();
   };
+  const down = (event: PointerEvent) => {
+    swipe.current = event.clientX;
+  };
+  const up = (event: PointerEvent) => {
+    const moved = event.clientX - swipe.current;
+    if (Math.abs(moved) > SWIPE) show(moved < 0 ? current + 1 : current - 1);
+  };
 
   return (
     <Box sx={{ display: 'grid', gap: 1.5, minWidth: 0 }}>
       <Paper variant="outlined" sx={{ borderRadius: 5, overflow: 'hidden' }}>
         <Box
-          ref={track}
-          onScroll={settled}
+          onPointerDown={down}
+          onPointerUp={up}
           sx={{
-            display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none',
-            '&::-webkit-scrollbar': { display: 'none' },
+            display: 'flex', touchAction: 'pan-y', transform: `translateX(-${current * 100}%)`,
+            transition: 'transform 300ms ease', '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
           }}
         >
           {views.map((view, index) => (
-            <Box key={view.id} aria-hidden={index !== current || undefined} sx={{ flex: '0 0 100%', scrollSnapAlign: 'start' }}>
+            <Box key={view.id} aria-hidden={index !== current || undefined} sx={{ flex: '0 0 100%' }}>
               <Box
                 component="img"
                 src={view.url}
@@ -71,7 +69,8 @@ export function ProductGallery({ product }: { product: Product }) {
                 width={1200}
                 height={900}
                 decoding="async"
-                sx={{ aspectRatio: '4 / 3', width: '100%', height: 'auto', objectFit: 'contain', display: 'block', bgcolor: '#FFFFFF' }}
+                draggable={false}
+                sx={{ aspectRatio: '4 / 3', width: '100%', height: 'auto', objectFit: 'contain', display: 'block', bgcolor: '#FFFFFF', userSelect: 'none' }}
               />
             </Box>
           ))}
