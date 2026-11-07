@@ -102,6 +102,9 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.2
     command: ["start-dev", "--import-realm"]
+    # A small init (tini) as process 1: it passes the stop signal on and reaps the processes Keycloak's start script
+    # leaves behind, so "docker compose down" never hangs on a container stuck half-stopped.
+    init: true
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
