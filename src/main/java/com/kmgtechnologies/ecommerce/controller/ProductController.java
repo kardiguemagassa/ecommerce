@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.controller;
 
+import com.kmgtechnologies.ecommerce.dto.ProductImageOrderRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.dto.TopSellingProductResponse;
@@ -118,7 +119,7 @@ public class ProductController {
         return productService.update(id, request);
     }
 
-    @Operation(summary = "Delete a product", description = "Evicts the cached product and deletes its image.")
+    @Operation(summary = "Delete a product", description = "Evicts the cached product and deletes its images.")
     @ApiResponse(responseCode = "204", description = "Product deleted")
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @ApiResponse(responseCode = "409", ref = CONFLICT)
@@ -128,11 +129,49 @@ public class ProductController {
         productService.delete(id);
     }
 
-    @Operation(summary = "Replace the image of a product",
+    @Operation(summary = "Add a view of a product",
             description = """
                     Multipart field `file`: JPEG, PNG or WebP, 2 MB at most (format read from the content). Stored as \
                     a JPEG within 1200 x 900 (whole picture, proportions kept, never enlarged), without the metadata of the \
-                    upload (EXIF, GPS). The previous image is deleted. Returns the product with its new `imageUrl`.""")
+                    upload (EXIF, GPS). Added after the other views; the first view is the main image. A product shows 4 \
+                    views at most: 409 with code `IMAGE_LIMIT` beyond. Returns the product with its `images`.""")
+    @ApiResponse(responseCode = "200", description = "View added")
+    @ApiResponse(responseCode = "404", ref = NOT_FOUND)
+    @ApiResponse(responseCode = "409", ref = CONFLICT)
+    @ApiResponse(responseCode = "413", ref = IMAGE_REJECTED)
+    @ApiResponse(responseCode = "415", ref = IMAGE_REJECTED)
+    @ApiResponse(responseCode = "422", ref = IMAGE_REJECTED)
+    @ApiResponse(responseCode = "503", ref = STORAGE_UNAVAILABLE)
+    @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ProductResponse addImage(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+        return productService.addImage(id, file);
+    }
+
+    @Operation(summary = "Remove a view of a product",
+            description = "The image is deleted from the storage; the next views move up (the second becomes the main "
+                    + "image when the first is removed). Returns the product with its `images`.")
+    @ApiResponse(responseCode = "200", description = "View removed")
+    @ApiResponse(responseCode = "404", ref = NOT_FOUND)
+    @DeleteMapping("/{id}/images/{imageId}")
+    public ProductResponse removeImage(@PathVariable Long id, @PathVariable Long imageId) {
+        return productService.removeImage(id, imageId);
+    }
+
+    @Operation(summary = "Change the order of the views of a product",
+            description = "Lists the ids of all the views of the product, each once, in their new order; the first "
+                    + "becomes the main image. Returns the product with its `images`.")
+    @ApiResponse(responseCode = "200", description = "Views reordered")
+    @ApiResponse(responseCode = "400", ref = BAD_REQUEST)
+    @ApiResponse(responseCode = "404", ref = NOT_FOUND)
+    @PutMapping("/{id}/images/order")
+    public ProductResponse reorderImages(@PathVariable Long id, @Valid @RequestBody ProductImageOrderRequest request) {
+        return productService.reorderImages(id, request);
+    }
+
+    @Operation(summary = "Replace the main image of a product", deprecated = true,
+            description = """
+                    Kept for clients of 2.0: replaces the first view (adds it when the product has none). Prefer \
+                    `POST /api/products/{id}/images`. Same rules for the file; the previous image is deleted.""")
     @ApiResponse(responseCode = "200", description = "Image stored")
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @ApiResponse(responseCode = "409", ref = CONFLICT)
@@ -145,7 +184,9 @@ public class ProductController {
         return productService.replaceImage(id, file);
     }
 
-    @Operation(summary = "Remove the image of a product")
+    @Operation(summary = "Remove the main image of a product", deprecated = true,
+            description = "Kept for clients of 2.0: removes the first view, the next one becomes the main image. "
+                    + "Prefer `DELETE /api/products/{id}/images/{imageId}`.")
     @ApiResponse(responseCode = "204", description = "Image removed (or there was none)")
     @ApiResponse(responseCode = "404", ref = NOT_FOUND)
     @DeleteMapping("/{id}/image")

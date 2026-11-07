@@ -105,8 +105,16 @@ class ApiDocsIT {
     @Test
     void imageUploadsAreMultipart() {
         Map<String, Object> productImage = apiDocs.read("$.paths['/api/products/{id}/image'].put.requestBody.content");
+        Map<String, Object> productView = apiDocs.read("$.paths['/api/products/{id}/images'].post.requestBody.content");
         Map<String, Object> avatar = apiDocs.read("$.paths['/api/me/avatar'].put.requestBody.content");
         assertThat(productImage).containsOnlyKeys("multipart/form-data");
+        assertThat(productView).containsOnlyKeys("multipart/form-data");
         assertThat(avatar).containsOnlyKeys("multipart/form-data");
+    }
+
+    @Test
+    void theSingleImageEndpointsOfVersion2AreDeprecated_forTheViews() {
+        assertThat(apiDocs.read("$.paths['/api/products/{id}/image'].put.deprecated", Boolean.class)).isTrue();
+        assertThat(apiDocs.read("$.paths['/api/products/{id}/image'].delete.deprecated", Boolean.class)).isTrue();
     }
 }

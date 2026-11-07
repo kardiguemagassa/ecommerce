@@ -23,7 +23,7 @@ describe('Admin: products', () => {
     await waitFor(() => expect(document.title).toBe('Produits · Administration · Comptoir'));
   });
 
-  it('checks the form in French, creates the product, then offers to add its image', async () => {
+  it('checks the form in French, creates the product, then offers to add its images', async () => {
     const user = userEvent.setup();
     sessionOf(admin);
     let created: unknown;
@@ -55,7 +55,7 @@ describe('Admin: products', () => {
     expect(await screen.findByRole('dialog', { name: 'Modifier « Lampe de bureau »' })).toBeInTheDocument();
     expect(created).toEqual({ name: 'Lampe de bureau', categoryId: 1, price: 34.5, stock: 25 });
     expect(router.state.location.search).toBe('?produit=20');
-    expect(screen.getByRole('button', { name: 'Choisir une image' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ajouter une image' })).toBeInTheDocument();
     expect(screen.getByText('Lampe de bureau créé')).toBeInTheDocument();
   });
 
@@ -107,13 +107,13 @@ describe('Admin: products', () => {
     sessionOf(admin);
     let uploads = 0;
     server.use(
-      http.put('*/api/products/11/image', () => {
+      http.post('*/api/products/11/images', () => {
         uploads += 1;
-        return HttpResponse.json({ ...mouse, imageUrl: '/media/products/mouse.jpg' });
+        return HttpResponse.json({ ...mouse, imageUrl: '/media/products/mouse.jpg', images: [{ id: 1, url: '/media/products/mouse.jpg' }] });
       }),
     );
     renderApp('/admin/produits?produit=11');
-    const input = await screen.findByLabelText('Choisir une image');
+    const input = await screen.findByLabelText('Ajouter une image');
 
     await user.upload(input, new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' }));
     expect(await screen.findByText("L'image est trop lourde : 2 Mo maximum.")).toBeInTheDocument();
@@ -121,7 +121,53 @@ describe('Admin: products', () => {
 
     await user.upload(input, new File([new Uint8Array(1024)], 'mouse.png', { type: 'image/png' }));
     await waitFor(() => expect(uploads).toBe(1));
-    expect(await screen.findByRole('button', { name: "Retirer l'image" })).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'Vue 1' })).toBeInTheDocument();
+    expect(screen.getByText('Principale')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retirer la vue 1' })).toBeInTheDocument();
+  });
+
+  it('moves a view before the main one, and removes a view once confirmed', async () => {
+    const user = userEvent.setup();
+    sessionOf(admin);
+    const front = { id: 1, url: '/media/products/front.jpg' };
+    const back = { id: 2, url: '/media/products/back.jpg' };
+    let order: unknown;
+    let removed: string | undefined;
+    server.use(
+      http.get('*/api/products/11', () => HttpResponse.json({ ...mouse, imageUrl: front.url, images: [front, back] })),
+      http.put('*/api/products/11/images/order', async ({ request }) => {
+        order = await request.json();
+        return HttpResponse.json({ ...mouse, imageUrl: back.url, images: [back, front] });
+      }),
+      http.delete('*/api/products/11/images/:imageId', ({ params }) => {
+        removed = params.imageId as string;
+        return HttpResponse.json({ ...mouse, imageUrl: front.url, images: [front] });
+      }),
+    );
+    renderApp('/admin/produits?produit=11');
+
+    expect(await screen.findByText('2 sur 4 · la première est l\'image principale', { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Placer la vue 1 avant' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Placer la vue 2 après' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Placer la vue 2 avant' }));
+    await waitFor(() => expect(order).toEqual({ imageIds: [2, 1] }));
+    expect(await screen.findByText('Ordre des images enregistré')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Vue 1' })).toHaveAttribute('src', back.url);
+
+    await user.click(screen.getByRole('button', { name: 'Retirer la vue 2' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Retirer cette image ?' });
+    await user.click(within(confirm).getByRole('button', { name: 'Retirer' }));
+    await waitFor(() => expect(removed).toBe('1'));
+  });
+
+  it('offers no new view once the product has four', async () => {
+    sessionOf(admin);
+    const images = [1, 2, 3, 4].map((id) => ({ id, url: `/media/products/view-${id}.jpg` }));
+    server.use(http.get('*/api/products/11', () => HttpResponse.json({ ...mouse, imageUrl: images[0]!.url, images })));
+    renderApp('/admin/produits?produit=11');
+
+    expect(await screen.findByRole('img', { name: 'Vue 4' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ajouter une image' })).not.toBeInTheDocument();
   });
 
   it('explains why a product already ordered cannot be deleted', async () => {

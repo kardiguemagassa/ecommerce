@@ -84,6 +84,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return imageProblem(HttpStatus.UNPROCESSABLE_CONTENT, "Invalid image", ex.getMessage(), "INVALID_IMAGE");
     }
 
+    @ExceptionHandler(ImageLimitException.class)
+    public ProblemDetail handleImageLimit(ImageLimitException ex) {
+        return imageProblem(HttpStatus.CONFLICT, "Too many images", ex.getMessage(), "IMAGE_LIMIT");
+    }
+
+    @ExceptionHandler(InvalidImageOrderException.class)
+    public ProblemDetail handleInvalidImageOrder(InvalidImageOrderException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid image order", ex.getMessage());
+    }
+
     @ExceptionHandler(StorageUnavailableException.class)
     public ProblemDetail handleStorageUnavailable(StorageUnavailableException ex) {
         log.warn("Media storage unavailable: {}", ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());

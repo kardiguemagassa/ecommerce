@@ -84,11 +84,15 @@ export function useDeleteProduct() {
   });
 }
 
-export function useReplaceProductImage() {
+/** Views a product shows at most (the API answers 409 IMAGE_LIMIT beyond). */
+export const MAX_PRODUCT_IMAGES = 4;
+
+/** A view of a product, after the others; the answer (the product with its views) replaces it everywhere. */
+export function useAddProductImage() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, file }: { id: number; file: File }) =>
-      unwrap(api.PUT('/api/products/{id}/image', { params: { path: { id } }, ...imageUpload(file) })),
+      unwrap(api.POST('/api/products/{id}/images', { params: { path: { id } }, ...imageUpload(file) })),
     onSuccess: (product) => {
       catalogueChanged(queryClient, product);
       notify.success(fr.admin.image.saved);
@@ -96,14 +100,27 @@ export function useReplaceProductImage() {
   });
 }
 
-export function useDeleteProductImage() {
+export function useRemoveProductImage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => unwrap(api.DELETE('/api/products/{id}/image', { params: { path: { id } } })),
-    onSuccess: (_nothing, id) => {
-      queryClient.setQueryData<Product>(productKeys.detail(id), (product) => product && { ...product, imageUrl: undefined });
-      catalogueChanged(queryClient);
+    mutationFn: ({ id, imageId }: { id: number; imageId: number }) =>
+      unwrap(api.DELETE('/api/products/{id}/images/{imageId}', { params: { path: { id, imageId } } })),
+    onSuccess: (product) => {
+      catalogueChanged(queryClient, product);
       notify.success(fr.admin.image.removed);
+    },
+  });
+}
+
+/** The views in a new order (ids of all of them); the first becomes the main image of the catalogue. */
+export function useReorderProductImages() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, imageIds }: { id: number; imageIds: number[] }) =>
+      unwrap(api.PUT('/api/products/{id}/images/order', { params: { path: { id } }, body: { imageIds } })),
+    onSuccess: (product) => {
+      catalogueChanged(queryClient, product);
+      notify.success(fr.admin.image.moved);
     },
   });
 }

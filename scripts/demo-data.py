@@ -191,7 +191,7 @@ def main():
         if not product.get("imageUrl"):
             light, deep = CATEGORIES[category]
             body, content_type = multipart(f"product-{index}.png", png(800, 600, light, deep, index + 1))
-            call("PUT", f"/products/{product['id']}/image", admin, body, content_type)
+            call("POST", f"/products/{product['id']}/images", admin, body, content_type)  # its main view
             print("    image")
 
     print("Orders (best sellers)")
