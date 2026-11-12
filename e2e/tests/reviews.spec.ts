@@ -25,7 +25,10 @@ test.describe('a customer', () => {
   test('reviews a product they bought, and the shop shows it with its stars', async ({ page }) => {
     await page.goto(`/produits/${bought.id}`);
     const form = page.getByRole('form', { name: 'Donner mon avis' });
-    await form.getByRole('radio', { name: '4 étoiles' }).check({ force: true }); // the radio is visually hidden under its star
+    // The radio is visually hidden: a click on its star (its label) chooses it, as a customer does
+    const fourStars = form.getByRole('radio', { name: '4 étoiles' });
+    await form.locator(`label[for="${await fourStars.getAttribute('id')}"]`).click();
+    await expect(fourStars).toBeChecked();
     await form.getByRole('textbox', { name: 'Commentaire (facultatif)' }).fill('Verse sans goutter.');
     await expectAccessible(page, 'the product page with the review form');
     await form.getByRole('button', { name: 'Publier mon avis' }).click();
