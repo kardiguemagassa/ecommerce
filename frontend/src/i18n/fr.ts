@@ -93,6 +93,7 @@ export const fr = {
     average: (value: number) => value.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
     count: (count: number) => (count === 0 ? 'Aucun avis' : `${count} avis`),
     countLink: (count: number) => `${count} avis`,
+    beFirst: 'Donner le premier avis',
     cardLabel: (value: number, count: number) =>
       `Note : ${value.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} sur 5, ${count} avis`,
     distribution: 'Répartition des notes',
@@ -170,6 +171,10 @@ export const fr = {
     subtotal: 'Sous-total',
     total: 'Total',
     allOrders: 'Toutes mes commandes',
+    review: 'Donner mon avis',
+    editReview: 'Modifier mon avis',
+    reviewOf: (product: string) => `Donner mon avis sur ${product}`,
+    editReviewOf: (product: string) => `Modifier mon avis sur ${product}`,
     notFound: 'Commande introuvable',
     notFoundHint: "Elle n'existe pas, ou elle appartient à un autre compte.",
   },

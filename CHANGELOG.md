@@ -6,6 +6,22 @@ versions [Semantic Versioning](https://semver.org/). Each release publishes two 
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-11-12
+
+### Changed
+
+- **The way to a review.** On a confirmed order, each item links to its review form: "Donner mon avis", or
+  "Modifier mon avis" once written. A product without review shows "Aucun avis · Donner le premier avis" under its
+  name, down to the reviews section.
+- Dependencies: AWS SDK 2.57.11; TanStack Query 5.107, Vite 8.3.7, Vite React plugin 6.3, MSW 3.0.4,
+  typescript-eslint 8.72.2; `actions/setup-java` 6.2, `docker/login-action` 4.8; development stack: SeaweedFS 4.53,
+  `grafana/otel-lgtm` 0.40.
+
+### Fixed
+
+- Once an order is confirmed while its page is open, its products may be reviewed at once: the answer "only buyers
+  may review" kept from before the order is asked again.
+
 ## [2.2.0] - 2026-11-07
 
 ### Added
@@ -141,7 +157,8 @@ the stack changes shape: the API is no longer published on its own port, everyth
 - Actuator and business metrics on a dedicated management port, Prometheus and Grafana.
 - Unit, slice and integration tests, JaCoCo coverage.
 
-[Unreleased]: https://github.com/kardiguemagassa/ecommerce/compare/v2.2.0...dev
+[Unreleased]: https://github.com/kardiguemagassa/ecommerce/compare/v2.2.1...dev
+[2.2.1]: https://github.com/kardiguemagassa/ecommerce/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/kardiguemagassa/ecommerce/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.1...v2.0.2
