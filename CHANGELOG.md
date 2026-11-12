@@ -6,6 +6,12 @@ versions [Semantic Versioning](https://semver.org/). Each release publishes two 
 
 ## [Unreleased]
 
+### Changed
+
+- CI: the images of the registries are pulled before the stack starts, three attempts 20 then 40 s apart; a registry
+  briefly unavailable (quay.io, Docker Hub) no longer fails the smoke and end-to-end jobs, a lasting outage fails
+  them on that step.
+
 ### Fixed
 
 - End-to-end test of the moderation: the visitor who checks that a hidden review is gone is now really anonymous
