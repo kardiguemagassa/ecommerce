@@ -72,6 +72,42 @@
         ],
         "type": "object"
       },
+      "AdminReviewResponse": {
+        "properties": {
+          "authorEmail": {
+            "type": "string"
+          },
+          "authorName": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "productId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "rating": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CartItemResponse": {
         "properties": {
           "imageUrl": {
@@ -165,6 +201,9 @@
       "MyReviewResponse": {
         "properties": {
           "allowed": {
+            "type": "boolean"
+          },
+          "hidden": {
             "type": "boolean"
           },
           "review": {
@@ -275,6 +314,24 @@
           "size",
           "totalElements",
           "totalPages"
+        ],
+        "type": "object"
+      },
+      "PagedModelAdminReviewResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/AdminReviewResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "content",
+          "page"
         ],
         "type": "object"
       },
@@ -567,6 +624,17 @@
             "$ref": "#/components/schemas/ProductRatingResponse"
           }
         },
+        "type": "object"
+      },
+      "ReviewVisibilityRequest": {
+        "properties": {
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hidden"
+        ],
         "type": "object"
       },
       "Session": {
@@ -887,6 +955,116 @@
         "summary": "Get an order of a customer (administrators)",
         "tags": [
           "Customers"
+        ]
+      }
+    },
+    "/api/admin/reviews": {
+      "get": {
+        "description": "Newest first, with their product and author; 20 a page.",
+        "operationId": "moderatedReviews",
+        "parameters": [
+          {
+            "description": "true: the hidden ones only; false: the visible ones only; absent: all",
+            "in": "query",
+            "name": "hidden",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Page number, from 0",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page size (1-50)",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedModelAdminReviewResponse"
+                }
+              }
+            },
+            "description": "Page of reviews returned"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        },
+        "summary": "Reviews to moderate",
+        "tags": [
+          "Reviews"
+        ]
+      }
+    },
+    "/api/admin/reviews/{id}/visibility": {
+      "put": {
+        "description": "A hidden review leaves the shop and the rating of its product; its author still sees it.",
+        "operationId": "setReviewVisibility",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewVisibilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReviewResponse"
+                }
+              }
+            },
+            "description": "Visibility changed"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Hide a review or show it again",
+        "tags": [
+          "Reviews"
         ]
       }
     },

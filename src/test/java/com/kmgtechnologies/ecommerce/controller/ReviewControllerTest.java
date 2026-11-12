@@ -96,7 +96,7 @@ class ReviewControllerTest {
     @Test
     @WithMockUser(roles = "CUSTOMER")
     void myReview_saysWhetherICanReview() throws Exception {
-        when(reviewService.mine(1L, 7L)).thenReturn(new MyReviewResponse(true, null));
+        when(reviewService.mine(1L, 7L)).thenReturn(new MyReviewResponse(true, null, false));
 
         mockMvc.perform(get("/api/me/products/7/review"))
                 .andExpect(status().isOk())

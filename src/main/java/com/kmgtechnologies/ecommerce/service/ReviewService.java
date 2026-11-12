@@ -1,6 +1,7 @@
 package com.kmgtechnologies.ecommerce.service;
 
 import com.kmgtechnologies.ecommerce.config.CacheNames;
+import com.kmgtechnologies.ecommerce.dto.AdminReviewResponse;
 import com.kmgtechnologies.ecommerce.dto.MyReviewResponse;
 import com.kmgtechnologies.ecommerce.dto.ProductRatingResponse;
 import com.kmgtechnologies.ecommerce.dto.ReviewRequest;
@@ -28,6 +29,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -82,10 +84,9 @@ public class ReviewService {
     /** Whether the customer may review the product, and their review if any (hidden ones included: it is theirs). */
     public MyReviewResponse mine(Long customerId, Long productId) {
         requireProduct(productId);
-        ReviewResponse review = reviewRepository.findByCustomerIdAndProductId(customerId, productId)
-                .map(ReviewResponse::from)
-                .orElse(null);
-        return new MyReviewResponse(hasBought(customerId, productId), review);
+        Optional<Review> review = reviewRepository.findByCustomerIdAndProductId(customerId, productId);
+        return new MyReviewResponse(hasBought(customerId, productId), review.map(ReviewResponse::from).orElse(null),
+                review.map(Review::isHidden).orElse(false));
     }
 
     /** Writes the customer's review of the product, or replaces it; 403 without a confirmed order of the product. */
@@ -113,6 +114,25 @@ public class ReviewService {
         Review review = reviewRepository.findByCustomerIdAndProductId(customerId, productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Review of product", productId));
         reviewRepository.delete(review);
+    }
+
+    /** Moderation: the latest reviews first, all of them or only the hidden (true) or visible (false) ones. */
+    public Page<AdminReviewResponse> moderation(Boolean hidden, int page, int size) {
+        return reviewRepository.findForModeration(hidden, PageRequest.of(page, size, NEWEST_FIRST))
+                .map(AdminReviewResponse::from);
+    }
+
+    /**
+     * Hides a review from the shop or shows it again. Every cached product is evicted (the review's product id is not
+     * a parameter here, and moderation is rare).
+     */
+    @Transactional
+    @CacheEvict(cacheNames = CacheNames.PRODUCTS, allEntries = true)
+    public AdminReviewResponse setHidden(Long reviewId, boolean hidden) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review", reviewId));
+        review.setHidden(hidden);
+        return AdminReviewResponse.from(review);
     }
 
     private boolean hasBought(Long customerId, Long productId) {

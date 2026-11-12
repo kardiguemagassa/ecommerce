@@ -1,5 +1,5 @@
-import { addToCart, adminApi, createCategory, createProduct, customerApi, emptyCart, placeOrder, waitConfirmed, type Seeded } from '../support/api';
-import { CUSTOMER, RUN } from '../support/env';
+import { addToCart, adminApi, createCategory, createProduct, customerApi, emptyCart, placeOrder, waitConfirmed, writeReview, type Seeded } from '../support/api';
+import { ADMIN, BASE_URL, CUSTOMER, RUN } from '../support/env';
 import { expect, expectAccessible, test } from '../support/fixtures';
 
 let bought: Seeded;
@@ -57,4 +57,35 @@ test('a visitor reads the reviews, and is offered to sign in to write one', asyn
   await page.goto(`/produits/${bought.id}`);
   await expect(page.getByRole('button', { name: 'Se connecter pour donner mon avis' })).toBeVisible();
   await expectAccessible(page, 'the product page of a visitor, with its reviews');
+});
+
+test.describe('the admin', () => {
+  test.use({ storageState: ADMIN.state });
+
+  test('hides a review: the shop no longer shows it, nor counts it in the rating', async ({ page, browser }) => {
+    // The review written through the pages above, written again here: this test also runs alone (a retry)
+    const alice = await customerApi();
+    await writeReview(alice, bought.id, 4, 'Verse sans goutter.');
+    await alice.dispose();
+
+    await page.goto('/admin/avis');
+    const row = page.getByRole('row').filter({ hasText: bought.name });
+    await expect(row.getByText('Verse sans goutter.')).toBeVisible();
+    await expectAccessible(page, 'the reviews moderation table');
+    await row.getByRole('button', { name: `Masquer l'avis de ${CUSTOMER.name} sur ${bought.name}` }).click();
+    await expect(page.getByText(/Avis masqué/)).toBeVisible();
+    await expect(row.getByText('Masqué', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Masqués' }).click();
+    await expect(page).toHaveURL(/statut=masques/);
+    await expect(page.getByRole('row').filter({ hasText: bought.name })).toBeVisible();
+
+    const visitor = await browser.newContext({ baseURL: BASE_URL });
+    const shop = await visitor.newPage();
+    await shop.goto(`/produits/${bought.id}`);
+    await expect(shop.getByRole('button', { name: 'Se connecter pour donner mon avis' })).toBeVisible();
+    await expect(shop.getByText('Verse sans goutter.')).toHaveCount(0);
+    await expect(shop.getByRole('link', { name: '1 avis' })).toHaveCount(0);
+    await visitor.close();
+  });
 });

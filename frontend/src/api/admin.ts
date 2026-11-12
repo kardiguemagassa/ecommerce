@@ -169,6 +169,49 @@ export function useDeleteCategory() {
   });
 }
 
+// Reviews (moderation) ---------------------------------------------------------------------------------------------
+
+/** Which reviews the moderation table shows: all of them, or only the hidden ones (`?statut=masques`). */
+export interface ReviewModerationSearch {
+  hiddenOnly: boolean;
+  page: number;
+}
+
+export const HIDDEN_ONLY_PARAM = 'statut';
+export const HIDDEN_ONLY_VALUE = 'masques';
+
+export const reviewModerationFrom = (params: URLSearchParams): ReviewModerationSearch => ({
+  hiddenOnly: params.get(HIDDEN_ONLY_PARAM) === HIDDEN_ONLY_VALUE,
+  page: pageParam(params),
+});
+
+export const adminReviewsQuery = ({ hiddenOnly, page }: ReviewModerationSearch) =>
+  queryOptions({
+    queryKey: ['reviews', 'moderation', { hiddenOnly, page }] as const,
+    queryFn: ({ signal }) =>
+      unwrap(
+        api.GET('/api/admin/reviews', {
+          params: { query: { hidden: hiddenOnly ? true : undefined, page: page - 1, size: ADMIN_PAGE_SIZE } },
+          signal,
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
+
+/** Hides a review from the shop or shows it again: the moderation table, the product's reviews and rating follow. */
+export function useSetReviewVisibility() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, hidden }: { id: number; hidden: boolean }) =>
+      unwrap(api.PUT('/api/admin/reviews/{id}/visibility', { params: { path: { id } }, body: { hidden } })),
+    onSuccess: (review) => {
+      void queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      void queryClient.invalidateQueries({ queryKey: productKeys.all });
+      notify.success(review.hidden ? fr.admin.reviews.hiddenDone : fr.admin.reviews.shownDone);
+    },
+  });
+}
+
 // Customers (support) ----------------------------------------------------------------------------------------------
 
 export const customerKeys = {

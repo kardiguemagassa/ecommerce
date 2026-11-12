@@ -5,10 +5,13 @@ import Typography from '@mui/material/Typography';
 import { Link as RouterLink } from 'react-router';
 import { fr } from '../i18n/fr';
 
-/** Results count and page links of an admin table; the links keep the search term (`base`: path of the table). */
-export function TablePager({ base, q, page, pages, total }: { base: string; q: string; page: number; pages: number; total: number }) {
+/**
+ * Results count and page links of an admin table; the links keep the search term and the filters (`base`: path of
+ * the table, `filters`: other parameters of the address).
+ */
+export function TablePager({ base, q, page, pages, total, filters = {} }: { base: string; q: string; page: number; pages: number; total: number; filters?: Record<string, string> }) {
   const href = (target: number) => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(filters);
     if (q) params.set('q', q);
     if (target > 1) params.set('page', String(target));
     const query = params.toString();

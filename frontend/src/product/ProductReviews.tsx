@@ -138,10 +138,10 @@ function MyReview({ productId }: { productId: number }) {
       </Typography>
     );
   }
-  return <ReviewForm key={mine.review?.updatedAt ?? 'new'} productId={productId} review={mine.review} />;
+  return <ReviewForm key={mine.review?.updatedAt ?? 'new'} productId={productId} review={mine.review} hidden={mine.hidden ?? false} />;
 }
 
-function ReviewForm({ productId, review }: { productId: number; review?: Review }) {
+function ReviewForm({ productId, review, hidden }: { productId: number; review?: Review; hidden: boolean }) {
   const save = useSaveReview(productId);
   const remove = useDeleteReview(productId);
   const [rating, setRating] = useState<number | null>(review?.rating ?? null);
@@ -164,6 +164,11 @@ function ReviewForm({ productId, review }: { productId: number; review?: Review 
       <Typography id="my-review-title" variant="h3" sx={{ fontSize: 18 }}>
         {review ? fr.reviews.editTitle : fr.reviews.writeTitle}
       </Typography>
+      {hidden && (
+        <Typography variant="body2" sx={{ p: 1.5, borderRadius: 2, bgcolor: '#FFF4E5', color: '#663C00' }}>
+          {fr.reviews.hiddenByModeration}
+        </Typography>
+      )}
       <Box component="fieldset" sx={{ border: 0, m: 0, p: 0, display: 'grid', gap: 0.5 }} aria-describedby={missing ? 'my-review-rating-error' : undefined}>
         <Typography component="legend" variant="body2" sx={{ fontWeight: 600, p: 0 }}>
           {fr.reviews.yourRating}

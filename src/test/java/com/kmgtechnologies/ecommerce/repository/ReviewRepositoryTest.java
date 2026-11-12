@@ -96,6 +96,17 @@ class ReviewRepositoryTest {
     }
 
     @Test
+    void findForModeration_filtersOnTheVisibility_orGivesThemAll() {
+        PageRequest page = PageRequest.of(0, 10, Sort.by(Sort.Order.desc("createdAt")));
+
+        assertThat(reviewRepository.findForModeration(null, page).getContent()).hasSize(3);
+        assertThat(reviewRepository.findForModeration(true, page).getContent())
+                .extracting(Review::getComment).containsExactly("spam");
+        assertThat(reviewRepository.findForModeration(false, page).getContent())
+                .extracting(review -> review.getProduct().getName()).containsExactly("Lamp", "Lamp");
+    }
+
+    @Test
     void aCustomerReviewsAProductOnce() {
         Review again = new Review(entityManager.find(Product.class, lamp.getId()),
                 entityManager.find(Customer.class, alice.getId()), 3, null, NOW);

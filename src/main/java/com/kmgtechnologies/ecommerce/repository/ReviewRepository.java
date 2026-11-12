@@ -19,6 +19,11 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @EntityGraph(attributePaths = "customer")
     Page<Review> findByProductIdAndHiddenFalse(Long productId, Pageable pageable);
 
+    /** Moderation: every review, or the hidden (true) or visible (false) ones, with their product and author. */
+    @EntityGraph(attributePaths = {"customer", "product"})
+    @Query("select r from Review r where :hidden is null or r.hidden = :hidden")
+    Page<Review> findForModeration(@Param("hidden") Boolean hidden, Pageable pageable);
+
     @Query("""
             select new com.kmgtechnologies.ecommerce.repository.StarCountRow(r.rating, count(r))
             from Review r
