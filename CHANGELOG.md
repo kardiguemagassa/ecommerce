@@ -6,6 +6,8 @@ versions [Semantic Versioning](https://semver.org/). Each release publishes two 
 
 ## [Unreleased]
 
+## [2.2.2] - 2026-11-12
+
 ### Changed
 
 - CI: the images of the registries are pulled before the stack starts, three attempts 20 then 40 s apart; a registry
@@ -168,7 +170,8 @@ the stack changes shape: the API is no longer published on its own port, everyth
 - Actuator and business metrics on a dedicated management port, Prometheus and Grafana.
 - Unit, slice and integration tests, JaCoCo coverage.
 
-[Unreleased]: https://github.com/kardiguemagassa/ecommerce/compare/v2.2.1...dev
+[Unreleased]: https://github.com/kardiguemagassa/ecommerce/compare/v2.2.2...dev
+[2.2.2]: https://github.com/kardiguemagassa/ecommerce/compare/v2.2.1...v2.2.2
 [2.2.1]: https://github.com/kardiguemagassa/ecommerce/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/kardiguemagassa/ecommerce/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.2...v2.1.0
