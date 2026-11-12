@@ -91,12 +91,14 @@ test.describe('the admin', () => {
     await expect(page).toHaveURL(/statut=masques/);
     await expect(page.getByRole('row').filter({ hasText: bought.name })).toBeVisible();
 
-    const visitor = await browser.newContext({ baseURL: BASE_URL });
+    // A visitor: an empty state, explicitly (browser.newContext() would take the admin session of test.use)
+    const visitor = await browser.newContext({ baseURL: BASE_URL, storageState: { cookies: [], origins: [] } });
     const shop = await visitor.newPage();
     await shop.goto(`/produits/${bought.id}`);
     await expect(shop.getByRole('button', { name: 'Se connecter pour donner mon avis' })).toBeVisible();
     await expect(shop.getByText('Verse sans goutter.')).toHaveCount(0);
     await expect(shop.getByRole('link', { name: '1 avis' })).toHaveCount(0);
+    await expect(shop.getByRole('link', { name: 'Donner le premier avis' })).toBeVisible(); // its only review is hidden
     await visitor.close();
   });
 });
