@@ -59,6 +59,11 @@ export async function waitConfirmed(api: APIRequestContext, orderId: number): Pr
   throw new Error(`order ${orderId} not confirmed after 10 s`);
 }
 
+/** Writes (or rewrites) the review of a product the customer ordered. */
+export async function writeReview(api: APIRequestContext, productId: number, rating: number, comment: string): Promise<void> {
+  await json(await api.put(`me/products/${productId}/review`, { data: { rating, comment } }), `review of ${productId}`);
+}
+
 export async function findCustomer(api: APIRequestContext, email: string): Promise<Seeded> {
   const page = await json<{ content: { id: number; fullName: string; email: string }[] }>(
     await api.get('admin/customers', { params: { q: email } }),

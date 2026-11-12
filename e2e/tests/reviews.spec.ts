@@ -1,4 +1,4 @@
-import { addToCart, adminApi, createCategory, createProduct, customerApi, emptyCart, placeOrder, waitConfirmed, type Seeded } from '../support/api';
+import { addToCart, adminApi, createCategory, createProduct, customerApi, emptyCart, placeOrder, waitConfirmed, writeReview, type Seeded } from '../support/api';
 import { ADMIN, BASE_URL, CUSTOMER, RUN } from '../support/env';
 import { expect, expectAccessible, test } from '../support/fixtures';
 
@@ -63,6 +63,11 @@ test.describe('the admin', () => {
   test.use({ storageState: ADMIN.state });
 
   test('hides a review: the shop no longer shows it, nor counts it in the rating', async ({ page, browser }) => {
+    // The review written through the pages above, written again here: this test also runs alone (a retry)
+    const alice = await customerApi();
+    await writeReview(alice, bought.id, 4, 'Verse sans goutter.');
+    await alice.dispose();
+
     await page.goto('/admin/avis');
     const row = page.getByRole('row').filter({ hasText: bought.name });
     await expect(row.getByText('Verse sans goutter.')).toBeVisible();

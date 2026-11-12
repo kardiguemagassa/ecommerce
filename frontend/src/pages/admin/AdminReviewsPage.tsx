@@ -41,7 +41,8 @@ export function AdminReviewsPage() {
         value={search.hiddenOnly ? 'hidden' : 'all'}
         onChange={(_event, value: string | null) => value && setParams(value === 'hidden' ? { [HIDDEN_ONLY_PARAM]: HIDDEN_ONLY_VALUE } : {})}
         aria-label={fr.admin.reviews.filter}
-        sx={{ justifySelf: 'start' }}
+        // The default grey of an unselected button is too pale on the page background (contrast below 4.5:1)
+        sx={{ justifySelf: 'start', '& .MuiToggleButton-root:not(.Mui-selected)': { color: 'text.secondary' } }}
       >
         <ToggleButton value="all">{fr.admin.reviews.all}</ToggleButton>
         <ToggleButton value="hidden">{fr.admin.reviews.hiddenOnly}</ToggleButton>
