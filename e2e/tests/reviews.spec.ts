@@ -34,10 +34,11 @@ test.describe('a customer', () => {
     await form.getByRole('button', { name: 'Publier mon avis' }).click();
     await expect(page.getByText('Merci, votre avis est publié')).toBeVisible();
 
-    const reviews = page.getByRole('region', { name: 'Avis clients' });
-    await expect(reviews.getByText('Verse sans goutter.')).toBeVisible();
-    await expect(reviews.getByText('Alice M.')).toBeVisible();
-    await expect(reviews.getByText('Achat vérifié')).toBeVisible();
+    // The published review, in the list (the form below keeps the same comment in its text field)
+    const published = page.getByRole('region', { name: 'Avis clients' }).getByRole('listitem').filter({ hasText: 'Verse sans goutter.' });
+    await expect(published).toBeVisible();
+    await expect(published.getByText('Alice M.')).toBeVisible();
+    await expect(published.getByText('Achat vérifié')).toBeVisible();
     await expect(page.getByRole('link', { name: '1 avis' })).toBeVisible();
     await expect(page.getByRole('form', { name: 'Mon avis' })).toBeVisible();
 
