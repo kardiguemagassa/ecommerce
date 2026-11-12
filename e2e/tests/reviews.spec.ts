@@ -4,6 +4,7 @@ import { expect, expectAccessible, test } from '../support/fixtures';
 
 let bought: Seeded;
 let notBought: Seeded;
+let orderId: number;
 
 test.beforeAll(async () => {
   const admin = await adminApi();
@@ -15,12 +16,21 @@ test.beforeAll(async () => {
   const alice = await customerApi();
   await emptyCart(alice);
   await addToCart(alice, bought.id, 1);
-  await waitConfirmed(alice, (await placeOrder(alice)).id);
+  orderId = (await placeOrder(alice)).id;
+  await waitConfirmed(alice, orderId);
   await alice.dispose();
 });
 
 test.describe('a customer', () => {
   test.use({ storageState: CUSTOMER.state });
+
+  test('goes from their confirmed order to the review form of what they bought', async ({ page }) => {
+    await page.goto(`/commandes/${orderId}`);
+    await page.getByRole('link', { name: `Donner mon avis sur ${bought.name}` }).click();
+    await expect(page).toHaveURL(new RegExp(`/produits/${bought.id}#avis$`));
+    await expect(page.getByRole('heading', { name: 'Avis clients' })).toBeInViewport(); // scrolled to the section
+    await expect(page.getByRole('form', { name: 'Donner mon avis' })).toBeVisible();
+  });
 
   test('reviews a product they bought, and the shop shows it with its stars', async ({ page }) => {
     await page.goto(`/produits/${bought.id}`);
@@ -49,6 +59,7 @@ test.describe('a customer', () => {
   test('is told why they cannot review a product they did not buy', async ({ page }) => {
     await page.goto(`/produits/${notBought.id}`);
     await expect(page.getByText(/Seuls les clients ayant commandé ce produit/)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Donner le premier avis' })).toHaveAttribute('href', '#avis');
     await expect(page.getByRole('button', { name: 'Publier mon avis' })).toHaveCount(0);
   });
 });

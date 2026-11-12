@@ -52,13 +52,21 @@ export function ProductPage() {
           <Typography variant="h1" component="h1" sx={{ fontSize: { xs: '1.75rem', md: '2.25rem' } }}>
             {product.name}
           </Typography>
-          {(product.rating?.count ?? 0) > 0 && (
+          {(product.rating?.count ?? 0) > 0 ? (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Stars value={product.rating?.average ?? 0} />
               <Link href={`#${REVIEWS_ANCHOR}`} underline="hover" sx={{ fontSize: 14 }}>
                 {fr.reviews.countLink(product.rating?.count ?? 0)}
               </Link>
             </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              {fr.reviews.count(0)} ·{' '}
+              {/* Underlined: inside a sentence, a link is not told apart by its colour alone */}
+              <Link href={`#${REVIEWS_ANCHOR}`} underline="always">
+                {fr.reviews.beFirst}
+              </Link>
+            </Typography>
           )}
           {product.description && (
             <Typography sx={{ fontSize: 16, lineHeight: 1.6, color: '#3D403F', maxWidth: '56ch', whiteSpace: 'pre-line' }}>{product.description}</Typography>

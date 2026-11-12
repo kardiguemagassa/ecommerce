@@ -1,7 +1,7 @@
 {
   "name": "ecommerce-web",
   "private": true,
-  "version": "2.2.0",
+  "version": "2.2.1",
   "type": "module",
   "engines": {
     "node": ">=24"
