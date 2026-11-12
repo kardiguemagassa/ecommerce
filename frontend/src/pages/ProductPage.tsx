@@ -6,12 +6,14 @@ import Typography from '@mui/material/Typography';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link as RouterLink, useParams } from 'react-router';
-import { DEFAULT_SORT, productQuery } from '../api/catalog';
+import { DEFAULT_SORT, productQuery, type Product } from '../api/catalog';
 import { catalogHref } from '../catalog/filters';
 import { fr } from '../i18n/fr';
 import { formatPrice } from '../i18n/format';
 import { AddToCartButton } from '../product/AddToCartButton';
 import { ProductGallery } from '../product/ProductGallery';
+import { ProductReviews, REVIEWS_ANCHOR } from '../product/ProductReviews';
+import { Stars } from '../product/Stars';
 import { QuantityStepper } from '../product/QuantityStepper';
 import { StockLabel } from '../product/StockLabel';
 
@@ -50,6 +52,14 @@ export function ProductPage() {
           <Typography variant="h1" component="h1" sx={{ fontSize: { xs: '1.75rem', md: '2.25rem' } }}>
             {product.name}
           </Typography>
+          {(product.rating?.count ?? 0) > 0 && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Stars value={product.rating?.average ?? 0} />
+              <Link href={`#${REVIEWS_ANCHOR}`} underline="hover" sx={{ fontSize: 14 }}>
+                {fr.reviews.countLink(product.rating?.count ?? 0)}
+              </Link>
+            </Box>
+          )}
           {product.description && (
             <Typography sx={{ fontSize: 16, lineHeight: 1.6, color: '#3D403F', maxWidth: '56ch', whiteSpace: 'pre-line' }}>{product.description}</Typography>
           )}
@@ -73,6 +83,38 @@ export function ProductPage() {
           </Box>
         </Box>
       </Box>
+      <ProductReviews productId={id} />
+      <StructuredData product={product} />
     </Box>
   );
+}
+
+/**
+ * The product for search engines (schema.org JSON-LD): name, pictures, price and availability, and the rating of its
+ * reviews, which lets Google show the stars in its results. A data block, never run: the Content Security Policy
+ * leaves it alone, and React writes it as text.
+ */
+function StructuredData({ product }: { product: Product }) {
+  const origin = window.location.origin;
+  const pictures = (product.images?.length ? product.images.map((view) => view.url) : [product.imageUrl]).filter(Boolean);
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description || undefined,
+    sku: `PRD-${String(product.id).padStart(4, '0')}`,
+    image: pictures.map((url) => new URL(url!, origin).href),
+    category: product.categoryName,
+    offers: {
+      '@type': 'Offer',
+      price: product.price?.toFixed(2),
+      priceCurrency: 'EUR',
+      availability: (product.stock ?? 0) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      url: `${origin}/produits/${product.id}`,
+    },
+    aggregateRating: (product.rating?.count ?? 0) > 0
+      ? { '@type': 'AggregateRating', ratingValue: product.rating?.average, reviewCount: product.rating?.count, bestRating: 5, worstRating: 1 }
+      : undefined,
+  };
+  return <script type="application/ld+json">{JSON.stringify(data)}</script>;
 }

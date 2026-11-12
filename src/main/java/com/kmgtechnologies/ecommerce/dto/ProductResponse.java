@@ -14,6 +14,7 @@ import java.util.List;
  * @param imageUrl public URL of the main image (JPEG within 1200 x 900, proportions kept), null without image
  * @param images   the views of the product, main image first, 4 at most; in the product details and the answers of the
  *                 changes only (empty in search results, which show the main image)
+ * @param rating   average and count of the visible reviews (in search results too: the catalogue cards show the stars)
  */
 public record ProductResponse(
         Long id,
@@ -24,10 +25,11 @@ public record ProductResponse(
         Long categoryId,
         String categoryName,
         String imageUrl,
-        List<ProductImageResponse> images
+        List<ProductImageResponse> images,
+        ProductRatingResponse rating
 ) {
 
-    public static ProductResponse from(Product product, MediaUrls urls) {
+    public static ProductResponse from(Product product, ProductRatingResponse rating, MediaUrls urls) {
         return new ProductResponse(
                 product.getId(),
                 product.getName(),
@@ -37,7 +39,8 @@ public record ProductResponse(
                 product.getCategory().getId(),
                 product.getCategory().getName(),
                 urls.of(product.getImageKey()),
-                views(product.getImages(), urls));
+                views(product.getImages(), urls),
+                rating);
     }
 
     /** A product of a search result: its main image only. */
@@ -48,7 +51,8 @@ public record ProductResponse(
     /** The product details: the row and its views, main image first. */
     public static ProductResponse from(ProductRow row, List<ProductImage> images, MediaUrls urls) {
         return new ProductResponse(row.id(), row.name(), row.description(), row.price(), row.stock(),
-                row.categoryId(), row.categoryName(), urls.of(row.imageKey()), views(images, urls));
+                row.categoryId(), row.categoryName(), urls.of(row.imageKey()), views(images, urls),
+                ProductRatingResponse.of(row.ratingAverage(), row.reviewCount()));
     }
 
     private static List<ProductImageResponse> views(List<ProductImage> images, MediaUrls urls) {

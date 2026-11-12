@@ -72,6 +72,42 @@
         ],
         "type": "object"
       },
+      "AdminReviewResponse": {
+        "properties": {
+          "authorEmail": {
+            "type": "string"
+          },
+          "authorName": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "productId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "rating": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CartItemResponse": {
         "properties": {
           "imageUrl": {
@@ -158,6 +194,20 @@
           "id": {
             "format": "int64",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "MyReviewResponse": {
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "review": {
+            "$ref": "#/components/schemas/ReviewResponse"
           }
         },
         "type": "object"
@@ -267,6 +317,24 @@
         ],
         "type": "object"
       },
+      "PagedModelAdminReviewResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/AdminReviewResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "content",
+          "page"
+        ],
+        "type": "object"
+      },
       "PagedModelCustomerResponse": {
         "properties": {
           "content": {
@@ -308,6 +376,24 @@
           "content": {
             "items": {
               "$ref": "#/components/schemas/ProductResponse"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/PageMetadata"
+          }
+        },
+        "required": [
+          "content",
+          "page"
+        ],
+        "type": "object"
+      },
+      "PagedModelReviewResponse": {
+        "properties": {
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewResponse"
             },
             "type": "array"
           },
@@ -391,6 +477,19 @@
         },
         "type": "object"
       },
+      "ProductRatingResponse": {
+        "properties": {
+          "average": {
+            "format": "double",
+            "type": "number"
+          },
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ProductRequest": {
         "properties": {
           "categoryId": {
@@ -457,11 +556,85 @@
           "price": {
             "type": "number"
           },
+          "rating": {
+            "$ref": "#/components/schemas/ProductRatingResponse"
+          },
           "stock": {
             "format": "int32",
             "type": "integer"
           }
         },
+        "type": "object"
+      },
+      "ReviewRequest": {
+        "properties": {
+          "comment": {
+            "maxLength": 1000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "rating": {
+            "format": "int32",
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "type": "object"
+      },
+      "ReviewResponse": {
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "rating": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ReviewSummaryResponse": {
+        "properties": {
+          "distribution": {
+            "items": {
+              "$ref": "#/components/schemas/StarCount"
+            },
+            "type": "array"
+          },
+          "rating": {
+            "$ref": "#/components/schemas/ProductRatingResponse"
+          }
+        },
+        "type": "object"
+      },
+      "ReviewVisibilityRequest": {
+        "properties": {
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hidden"
+        ],
         "type": "object"
       },
       "Session": {
@@ -486,6 +659,19 @@
               "type": "string"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "StarCount": {
+        "properties": {
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "stars": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -769,6 +955,116 @@
         "summary": "Get an order of a customer (administrators)",
         "tags": [
           "Customers"
+        ]
+      }
+    },
+    "/api/admin/reviews": {
+      "get": {
+        "description": "Newest first, with their product and author; 20 a page.",
+        "operationId": "moderatedReviews",
+        "parameters": [
+          {
+            "description": "true: the hidden ones only; false: the visible ones only; absent: all",
+            "in": "query",
+            "name": "hidden",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Page number, from 0",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page size (1-50)",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedModelAdminReviewResponse"
+                }
+              }
+            },
+            "description": "Page of reviews returned"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        },
+        "summary": "Reviews to moderate",
+        "tags": [
+          "Reviews"
+        ]
+      }
+    },
+    "/api/admin/reviews/{id}/visibility": {
+      "put": {
+        "description": "A hidden review leaves the shop and the rating of its product; its author still sees it.",
+        "operationId": "setReviewVisibility",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewVisibilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReviewResponse"
+                }
+              }
+            },
+            "description": "Visibility changed"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Hide a review or show it again",
+        "tags": [
+          "Reviews"
         ]
       }
     },
@@ -1320,6 +1616,125 @@
         "summary": "Get an order with its lines",
         "tags": [
           "Orders"
+        ]
+      }
+    },
+    "/api/me/products/{id}/review": {
+      "delete": {
+        "operationId": "deleteMyReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Review deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Delete my review of a product",
+        "tags": [
+          "Reviews"
+        ]
+      },
+      "get": {
+        "description": "Whether I may review it (a confirmed order of the product) and my review, if any.",
+        "operationId": "myReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyReviewResponse"
+                }
+              }
+            },
+            "description": "Returned"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "My review of a product",
+        "tags": [
+          "Reviews"
+        ]
+      },
+      "put": {
+        "description": "1 to 5 stars, a comment of 1000 characters at most. Replaces my previous review. 403 with code `REVIEW_NOT_ALLOWED` without a confirmed order of the product.",
+        "operationId": "saveMyReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResponse"
+                }
+              }
+            },
+            "description": "Review saved"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResponse"
+                }
+              }
+            },
+            "description": "No confirmed order of the product (code REVIEW_NOT_ALLOWED)"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Write or change my review of a product",
+        "tags": [
+          "Reviews"
         ]
       }
     },
@@ -1882,6 +2297,106 @@
           "Products"
         ]
       }
+    },
+    "/api/products/{id}/reviews": {
+      "get": {
+        "description": "Visible reviews, newest first; 10 a page by default.",
+        "operationId": "productReviews",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page number, from 0",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page size (1-50)",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "format": "int32",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedModelReviewResponse"
+                }
+              }
+            },
+            "description": "Page of reviews returned"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Reviews of a product",
+        "tags": [
+          "Reviews"
+        ]
+      }
+    },
+    "/api/products/{id}/reviews/summary": {
+      "get": {
+        "description": "Average, count and spread over 5 down to 1 stars.",
+        "operationId": "reviewSummary",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSummaryResponse"
+                }
+              }
+            },
+            "description": "Summary returned"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "summary": "Rating of a product",
+        "tags": [
+          "Reviews"
+        ]
+      }
     }
   },
   "security": [
@@ -1893,6 +2408,10 @@
     {
       "description": "The signed-in customer, and customer support for administrators",
       "name": "Customers"
+    },
+    {
+      "description": "Reviews of the products: read by everyone, written by the customers who bought them",
+      "name": "Reviews"
     },
     {
       "description": "Cart of the signed-in customer (one cart per customer)",
