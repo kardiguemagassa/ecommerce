@@ -28,6 +28,32 @@ describe('Order tracking page', () => {
     await waitFor(() => expect(document.title).toBe('Commande n° 1042 · Comptoir'));
   });
 
+  it('leads from each item of a confirmed order to its review: to give, or to change', async () => {
+    sessionOf(alice);
+    server.use(
+      http.get('*/api/me/products/10/review', () =>
+        HttpResponse.json({ allowed: true, review: { id: 5, rating: 4, author: 'Alice M.', createdAt: order.createdAt, updatedAt: order.createdAt } }),
+      ),
+      http.get('*/api/me/products/11/review', () => HttpResponse.json({ allowed: true })),
+    );
+    renderApp('/commandes/1042');
+
+    expect(await screen.findByRole('link', { name: 'Modifier mon avis sur Clavier mécanique TKL' })).toHaveAttribute('href', '/produits/10#avis');
+    expect(await screen.findByRole('link', { name: 'Donner mon avis sur Souris sans fil' })).toHaveAttribute('href', '/produits/11#avis');
+  });
+
+  it('offers no review while the order is pending', async () => {
+    sessionOf(alice);
+    server.use(
+      http.get('*/api/me/orders/1042', () => HttpResponse.json({ ...order, status: 'PENDING' })),
+      http.get('*/api/me/products/:id/review', () => HttpResponse.json({ allowed: true })),
+    );
+    renderApp('/commandes/1042');
+
+    expect(await screen.findByText('En attente de confirmation…')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /mon avis/ })).not.toBeInTheDocument();
+  });
+
   it('follows a pending order every 2 s until it is confirmed, then stops asking', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const success = vi.spyOn(notify, 'success');

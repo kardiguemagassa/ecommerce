@@ -20,6 +20,13 @@ describe('Product page', () => {
     await waitFor(() => expect(document.title).toBe('Clavier mécanique TKL · Comptoir'));
   });
 
+  it('invites to give the first review of a product that has none', async () => {
+    renderApp('/produits/10');
+
+    expect(await screen.findByText(/^Aucun avis ·/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Donner le premier avis' })).toHaveAttribute('href', '#avis');
+  });
+
   it('keeps the quantity between 1 and the stock, and adds that quantity', async () => {
     const user = userEvent.setup();
     sessionOf(alice);

@@ -15,14 +15,16 @@ import TableFooter from '@mui/material/TableFooter';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { Link as RouterLink, useParams } from 'react-router';
 import { orderQuery, type Order, type OrderStatus } from '../api/orders';
+import { myReviewQuery } from '../api/reviews';
 import { notify } from '../app/notifications';
 import { OrderStatusChip } from '../components/OrderStatusChip';
 import { fr } from '../i18n/fr';
 import { formatDateTime, formatPrice, formatTime } from '../i18n/format';
+import { REVIEWS_ANCHOR } from '../product/ProductReviews';
 
 /**
  * Live tracking of an order; the route loader has fetched it (or answered 404). The query polls the API while the
@@ -90,6 +92,7 @@ export function OrderPage() {
                     <Link component={RouterLink} to={`/produits/${item.productId}`} underline="hover" color="text.primary">
                       {item.productName}
                     </Link>
+                    {confirmed && item.productId != null && <ReviewLink productId={item.productId} productName={item.productName ?? ''} />}
                   </TableCell>
                   <TableCell align="right">{item.quantity}</TableCell>
                   <TableCell align="right">{formatPrice(item.unitPrice)}</TableCell>
@@ -118,6 +121,26 @@ export function OrderPage() {
   );
 }
 
+/**
+ * Under an item of a confirmed order: the way to its review form ("Donner mon avis", or "Modifier mon avis" once
+ * written). Nothing while the answer is loading, nor if the product may not be reviewed (removed from the shop).
+ */
+function ReviewLink({ productId, productName }: { productId: number; productName: string }) {
+  const { data: mine } = useQuery(myReviewQuery(productId));
+  if (!mine?.allowed) return null;
+  const written = mine.review != null;
+  return (
+    <Link
+      component={RouterLink}
+      to={`/produits/${productId}#${REVIEWS_ANCHOR}`}
+      aria-label={written ? fr.order.editReviewOf(productName) : fr.order.reviewOf(productName)}
+      sx={{ display: 'block', fontSize: 14, mt: 0.5 }}
+    >
+      {written ? fr.order.editReview : fr.order.review}
+    </Link>
+  );
+}
+
 const Caption = ({ children }: { children: string }) => (
   <Typography variant="caption" color="text.secondary">
     {children}
@@ -126,10 +149,15 @@ const Caption = ({ children }: { children: string }) => (
 
 /** A toast when the confirmation arrives while the page is open (not for an order already confirmed). */
 function useConfirmationToast(order: Order | undefined) {
+  const queryClient = useQueryClient();
   const seen = useRef<OrderStatus | undefined>(undefined);
   useEffect(() => {
     const status = order?.status;
-    if (seen.current === 'PENDING' && status === 'CONFIRMED') notify.success(fr.order.confirmed(order!.id!));
+    if (seen.current === 'PENDING' && status === 'CONFIRMED') {
+      notify.success(fr.order.confirmed(order!.id!));
+      // Its products may now be reviewed: an answer "not allowed" kept from before the order is out of date
+      void queryClient.invalidateQueries({ queryKey: ['reviews'] });
+    }
     seen.current = status;
-  }, [order]);
+  }, [order, queryClient]);
 }

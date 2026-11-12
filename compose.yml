@@ -171,7 +171,7 @@ services:
   # The credentials from .env are its only identity (administrator); the API makes the bucket's objects publicly
   # readable at startup (bucket policy: GetObject only). Production: any S3 provider, same API.
   media:
-    image: chrislusf/seaweedfs:4.52
+    image: chrislusf/seaweedfs:4.53
     command: ["mini", "-dir=/data", "-webdav=false", "-s3.port.iceberg=0", "-s3.port.lance=0"]
     environment:
       AWS_ACCESS_KEY_ID: ${MEDIA_ACCESS_KEY:?MEDIA_ACCESS_KEY is required}
@@ -194,7 +194,7 @@ services:
   # Observability backend for development, in one container: OpenTelemetry collector (OTLP), Tempo (traces),
   # Prometheus (metrics), Loki (logs) and Grafana. Not a production setup: no persistence, default admin account.
   otel-lgtm:
-    image: grafana/otel-lgtm:0.39.0
+    image: grafana/otel-lgtm:0.40.0
     ports:
       - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"   # Grafana (admin / admin)
       - "127.0.0.1:4318:4318"                     # OTLP over HTTP, for the application started on the host
