@@ -5,6 +5,7 @@ import com.kmgtechnologies.ecommerce.service.TopSellingProductService;
 import org.springframework.test.context.ActiveProfiles;
 import com.kmgtechnologies.ecommerce.dto.ProductImageOrderRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductImageResponse;
+import com.kmgtechnologies.ecommerce.dto.ProductRatingResponse;
 import com.kmgtechnologies.ecommerce.dto.ProductRequest;
 import com.kmgtechnologies.ecommerce.dto.ProductResponse;
 import com.kmgtechnologies.ecommerce.exception.ImageLimitException;
@@ -56,7 +57,8 @@ class ProductControllerTest {
     private static final ProductResponse LAPTOP = new ProductResponse(
             1L, "Laptop", "15 inch", new BigDecimal("999.99"), 10, 2L, "Electronics",
             "http://media.test/ecommerce-media/products/laptop.jpg",
-            List.of(new ProductImageResponse(10L, "http://media.test/ecommerce-media/products/laptop.jpg")));
+            List.of(new ProductImageResponse(10L, "http://media.test/ecommerce-media/products/laptop.jpg")),
+            new ProductRatingResponse(4.5, 2));
 
     private static final MockMultipartFile IMAGE = new MockMultipartFile("file", "laptop.png", "image/png", new byte[]{1});
 
@@ -89,6 +91,8 @@ class ProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].name").value("Laptop"))
                 .andExpect(jsonPath("$.content[0].categoryName").value("Electronics"))
+                .andExpect(jsonPath("$.content[0].rating.average").value(4.5))
+                .andExpect(jsonPath("$.content[0].rating.count").value(2))
                 .andExpect(jsonPath("$.page.totalElements").value(1))
                 .andExpect(jsonPath("$.page.number").value(0));
     }

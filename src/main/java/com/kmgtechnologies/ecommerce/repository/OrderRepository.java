@@ -3,6 +3,7 @@ package com.kmgtechnologies.ecommerce.repository;
 import com.kmgtechnologies.ecommerce.dto.OrderSummaryResponse;
 import com.kmgtechnologies.ecommerce.dto.TopSellingProductResponse;
 import com.kmgtechnologies.ecommerce.entity.Order;
+import com.kmgtechnologies.ecommerce.entity.OrderStatus;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,4 +38,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             ORDER BY sum(i.quantity) desc, p.id
             """)
     List<TopSellingProductResponse> findTopSelling(Limit limit);
+
+    /** Whether the customer has an order of this status containing the product (a verified purchase when CONFIRMED). */
+    @Query("""
+            select count(o) > 0
+            from Order o
+            join o.items i
+            where o.customer.id = :customerId and i.product.id = :productId and o.status = :status
+            """)
+    boolean hasOrdered(@Param("customerId") Long customerId, @Param("productId") Long productId,
+                       @Param("status") OrderStatus status);
 }

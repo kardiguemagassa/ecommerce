@@ -49,6 +49,16 @@ export async function placeOrder(api: APIRequestContext): Promise<Seeded> {
   return json(await api.post('me/orders'), 'order');
 }
 
+/** The order once confirmed: the confirmation runs after the commit, in the background (a few hundred ms). */
+export async function waitConfirmed(api: APIRequestContext, orderId: number): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const order = await json<{ status: string }>(await api.get(`me/orders/${orderId}`), `order ${orderId}`);
+    if (order.status === 'CONFIRMED') return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`order ${orderId} not confirmed after 10 s`);
+}
+
 export async function findCustomer(api: APIRequestContext, email: string): Promise<Seeded> {
   const page = await json<{ content: { id: number; fullName: string; email: string }[] }>(
     await api.get('admin/customers', { params: { q: email } }),

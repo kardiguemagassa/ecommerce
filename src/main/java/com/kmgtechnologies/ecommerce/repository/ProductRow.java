@@ -2,7 +2,10 @@ package com.kmgtechnologies.ecommerce.repository;
 
 import java.math.BigDecimal;
 
-/** A product with its category name, read in one query; the API response adds the public URL of the image. */
+/**
+ * A product with its category name and the rating of its visible reviews, read in one query; the API response adds the
+ * public URL of the image.
+ */
 public record ProductRow(
         Long id,
         String name,
@@ -11,6 +14,8 @@ public record ProductRow(
         int stock,
         Long categoryId,
         String categoryName,
-        String imageKey
+        String imageKey,
+        Double ratingAverage,
+        Long reviewCount
 ) {
 }

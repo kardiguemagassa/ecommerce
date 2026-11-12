@@ -13,7 +13,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query(value = """
             SELECT new com.kmgtechnologies.ecommerce.repository.ProductRow(
-                p.id, p.name, p.description, p.price, p.stock, c.id, c.name, p.imageKey)
+                p.id, p.name, p.description, p.price, p.stock, c.id, c.name, p.imageKey,
+                (SELECT avg(r.rating) FROM Review r WHERE r.product = p AND r.hidden = false),
+                (SELECT count(r) FROM Review r WHERE r.product = p AND r.hidden = false))
             FROM Product p
             JOIN p.category c
             WHERE (:categoryId is null or c.id = :categoryId)
@@ -31,7 +33,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query("""
             select new com.kmgtechnologies.ecommerce.repository.ProductRow(
-                p.id, p.name, p.description, p.price, p.stock, c.id, c.name, p.imageKey)
+                p.id, p.name, p.description, p.price, p.stock, c.id, c.name, p.imageKey,
+                (select avg(r.rating) from Review r where r.product = p and r.hidden = false),
+                (select count(r) from Review r where r.product = p and r.hidden = false))
             from Product p
             join p.category c
             where p.id = :id
