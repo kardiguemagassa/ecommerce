@@ -8,6 +8,7 @@ const SECTIONS = [
   { to: '/admin/categories', label: fr.admin.tabs.categories },
   { to: '/admin/ventes', label: fr.admin.tabs.bestSellers },
   { to: '/admin/clients', label: fr.admin.tabs.customers },
+  { to: '/admin/avis', label: fr.admin.tabs.reviews },
 ];
 
 /**

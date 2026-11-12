@@ -1,5 +1,6 @@
 package com.kmgtechnologies.ecommerce.service;
 
+import com.kmgtechnologies.ecommerce.dto.AdminReviewResponse;
 import com.kmgtechnologies.ecommerce.dto.MyReviewResponse;
 import com.kmgtechnologies.ecommerce.dto.ReviewRequest;
 import com.kmgtechnologies.ecommerce.dto.ReviewResponse;
@@ -132,6 +133,41 @@ class ReviewServiceTest {
 
         assertThat(mine.allowed()).isTrue();
         assertThat(mine.review()).isNull();
+        assertThat(mine.hidden()).isFalse();
+    }
+
+    @Test
+    void mine_tellsTheAuthorThatTheModerationHidTheirReview() {
+        Review hidden = new Review(lamp, alice, 1, "spam", NOW);
+        hidden.setHidden(true);
+        when(productRepository.findById(7L)).thenReturn(Optional.of(lamp));
+        when(orderRepository.hasOrdered(1L, 7L, OrderStatus.CONFIRMED)).thenReturn(true);
+        when(reviewRepository.findByCustomerIdAndProductId(1L, 7L)).thenReturn(Optional.of(hidden));
+
+        MyReviewResponse mine = reviewService.mine(1L, 7L);
+
+        assertThat(mine.review().rating()).isEqualTo(1);
+        assertThat(mine.hidden()).isTrue();
+    }
+
+    @Test
+    void setHidden_hidesTheReview_andGivesItBackForTheModeration() {
+        Review review = new Review(lamp, alice, 1, "spam", NOW);
+        when(reviewRepository.findById(3L)).thenReturn(Optional.of(review));
+
+        AdminReviewResponse moderated = reviewService.setHidden(3L, true);
+
+        assertThat(review.isHidden()).isTrue();
+        assertThat(moderated.hidden()).isTrue();
+        assertThat(moderated.authorEmail()).isEqualTo("alice@example.com");
+        assertThat(moderated.productName()).isEqualTo("Lamp");
+    }
+
+    @Test
+    void setHidden_ofAnUnknownReview_is404() {
+        when(reviewRepository.findById(3L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> reviewService.setHidden(3L, true)).isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test

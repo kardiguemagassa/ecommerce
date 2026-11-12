@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { data, Navigate, type LoaderFunctionArgs, type RouteObject } from 'react-router';
-import { BEST_SELLERS_LIMIT, adminProductsQuery, adminSearchFrom, customersQuery } from '../api/admin';
+import { BEST_SELLERS_LIMIT, adminProductsQuery, adminReviewsQuery, adminSearchFrom, customersQuery, reviewModerationFrom } from '../api/admin';
 import { cartQuery } from '../api/cart';
 import { bestSellersQuery, categoriesQuery, productListQuery, productQuery, type Product } from '../api/catalog';
 import { orderPageFrom, orderQuery, ordersQuery, type Order } from '../api/orders';
@@ -76,6 +76,11 @@ const adminBestSellersLoader = (queryClient: QueryClient) =>
 
 const adminCustomersLoader = (queryClient: QueryClient) =>
   forAdmin(queryClient, ({ request }) => queryClient.ensureQueryData({ ...customersQuery(searchOf(request)), revalidateIfStale: true }));
+
+const adminReviewsLoader = (queryClient: QueryClient) =>
+  forAdmin(queryClient, ({ request }) =>
+    queryClient.ensureQueryData({ ...adminReviewsQuery(reviewModerationFrom(new URL(request.url).searchParams)), revalidateIfStale: true }),
+  );
 
 /**
  * Catalogue: the page of products and the categories are fetched while the page module loads (render as you fetch),
@@ -204,6 +209,12 @@ export const createRoutes = (queryClient: QueryClient): RouteObject[] => [
                     handle: titled(fr.admin.titles.customers),
                     loader: adminCustomersLoader(queryClient),
                     lazy: () => import('../pages/admin/AdminCustomersPage').then((module) => ({ Component: module.AdminCustomersPage })),
+                  },
+                  {
+                    path: 'avis',
+                    handle: titled(fr.admin.titles.reviews),
+                    loader: adminReviewsLoader(queryClient),
+                    lazy: () => import('../pages/admin/AdminReviewsPage').then((module) => ({ Component: module.AdminReviewsPage })),
                   },
                 ],
               },

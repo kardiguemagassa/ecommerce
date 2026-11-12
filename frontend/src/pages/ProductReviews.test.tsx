@@ -130,6 +130,19 @@ describe('Reviews of a product', () => {
     await waitFor(() => expect(deleted).toBe(true));
   });
 
+  it('tells a buyer that the moderation hid their review', async () => {
+    sessionOf(alice);
+    server.use(
+      http.get('*/api/me/products/10/review', () =>
+        HttpResponse.json({ allowed: true, hidden: true, review: review(9, 1, 'Alice M.', 'Hors sujet') }),
+      ),
+    );
+    renderApp('/produits/10');
+
+    const form = await screen.findByRole('form', { name: 'Mon avis' });
+    expect(within(form).getByText(/La modération a masqué votre avis/)).toBeInTheDocument();
+  });
+
   it('shows the stars of a product on its catalogue card', async () => {
     server.use(http.get('*/api/products', () => HttpResponse.json(pageOf([rated, ...products.slice(1)]))));
     renderApp('/');
