@@ -24,7 +24,7 @@
              manages (opentelemetry.version 1.62.0 pairs with instrumentation 2.28.0): update both together. -->
         <opentelemetry-instrumentation.version>2.28.0-alpha</opentelemetry-instrumentation.version>
         <!-- Object storage client (S3 API: SeaweedFS in development, any S3 provider in production) -->
-        <aws-sdk.version>2.57.9</aws-sdk.version>
+        <aws-sdk.version>2.57.11</aws-sdk.version>
         <!-- ImageIO plug-ins: WebP and CMYK JPEG decoding, which the JDK lacks -->
         <twelvemonkeys.version>3.15.3</twelvemonkeys.version>
     </properties>
