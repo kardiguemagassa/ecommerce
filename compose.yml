@@ -171,7 +171,7 @@ services:
   # The credentials from .env are its only identity (administrator); the API makes the bucket's objects publicly
   # readable at startup (bucket policy: GetObject only). Production: any S3 provider, same API.
   media:
-    image: chrislusf/seaweedfs:4.52
+    image: chrislusf/seaweedfs:4.53
     command: ["mini", "-dir=/data", "-webdav=false", "-s3.port.iceberg=0", "-s3.port.lance=0"]
     environment:
       AWS_ACCESS_KEY_ID: ${MEDIA_ACCESS_KEY:?MEDIA_ACCESS_KEY is required}
