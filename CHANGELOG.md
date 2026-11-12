@@ -6,6 +6,11 @@ versions [Semantic Versioning](https://semver.org/). Each release publishes two 
 
 ## [Unreleased]
 
+### Fixed
+
+- End-to-end test of the moderation: the visitor who checks that a hidden review is gone is now really anonymous
+  (`browser.newContext()` took the admin session of the test, so the check failed whenever that session was valid).
+
 ## [2.2.1] - 2026-11-12
 
 ### Changed
