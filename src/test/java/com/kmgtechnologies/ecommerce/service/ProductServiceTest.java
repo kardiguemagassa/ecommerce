@@ -15,6 +15,7 @@ import com.kmgtechnologies.ecommerce.repository.CategoryRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductImageRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRepository;
 import com.kmgtechnologies.ecommerce.repository.ProductRow;
+import com.kmgtechnologies.ecommerce.repository.ReviewRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -48,6 +49,9 @@ class ProductServiceTest {
 
     @Mock
     private ProductImageRepository productImageRepository;
+
+    @Mock
+    private ReviewRepository reviewRepository;
 
     @Mock
     private CategoryRepository categoryRepository;
@@ -213,13 +217,14 @@ class ProductServiceTest {
         Product product = productWithImage("products/front.jpg");
         ReflectionTestUtils.setField(product.addImage("products/back.jpg"), "id", 2L);
         when(productRepository.findRowById(5L)).thenReturn(Optional.of(new ProductRow(
-                5L, "Laptop", null, new BigDecimal("999.99"), 10, 1L, "Electronics", "products/front.jpg")));
+                5L, "Laptop", null, new BigDecimal("999.99"), 10, 1L, "Electronics", "products/front.jpg", 4.5, 2L)));
         when(productImageRepository.findByProductIdOrderByDisplayOrderAsc(5L)).thenReturn(product.getImages());
         when(mediaUrls.of(any())).thenAnswer(invocation -> "http://media.test/" + invocation.getArgument(0));
 
         ProductResponse response = productService.findById(5L);
 
         assertThat(response.imageUrl()).isEqualTo("http://media.test/products/front.jpg");
+        assertThat(response.rating().average()).isEqualTo(4.5);
         assertThat(response.images()).extracting("id", "url").containsExactly(
                 tuple(1L, "http://media.test/products/front.jpg"),
                 tuple(2L, "http://media.test/products/back.jpg"));

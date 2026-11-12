@@ -4,7 +4,8 @@
     ./scripts/demo-data.py            # stack running: docker compose --profile app up -d --wait
 
 Five categories, twenty products with a generated image each (abstract visuals in the colours of the shop, not
-photos), then a few orders of alice@example.com so that the best sellers show demo products. Idempotent: what already exists
+photos), then a few orders of alice@example.com so that the best sellers show demo products, and her reviews of the
+products she bought (development data, written by the demo account). Idempotent: what already exists
 (same name) is kept, a product without image gets one, orders are only placed while fewer than four demo products are
 among the best sellers (the smoke test's products may be there too). Tokens come from scripts/dev-token.sh (SHOP_ADMIN_EMAIL and DEMO_USER_PASSWORD from .env).
 Python standard library only. Development only.
@@ -87,6 +88,14 @@ ORDERS = [
     [("Clavier mécanique TKL", 4), ("Écran 27 pouces QHD", 2), ("Tapis de yoga", 5)],
     [("Enceinte Bluetooth", 5), ("Lampe de bureau LED", 3), ("Gourde isotherme", 4)],
 ]
+
+# Reviews of alice@example.com on products she ordered (a review needs a confirmed order): name → (stars, comment).
+REVIEWS = {
+    "Clavier mécanique TKL": (5, "Frappe nette, rétroéclairage discret. Je recommande."),
+    "Enceinte Bluetooth": (4, "Bon son pour la taille, l'autonomie tient la journée."),
+    "Gourde isotherme": (5, None),
+    "Tapis de yoga": (3, "Confortable, mais l'odeur met quelques jours à partir."),
+}
 
 
 def setting(name):
@@ -206,6 +215,22 @@ def main():
                 call("POST", "/me/cart/items", alice, {"productId": product_ids[name], "quantity": quantity})
             _, order = call("POST", "/me/orders", alice)
             print(f"  + order {order['id']} of {CUSTOMER}")
+
+    print(f"Reviews of {CUSTOMER}")
+    for name, (stars, comment) in REVIEWS.items():
+        product_id = product_ids[name]
+        for _ in range(40):  # the orders are confirmed in the background, after their commit
+            _, mine = call("GET", f"/me/products/{product_id}/review", alice)
+            if mine["allowed"]:
+                break
+            time.sleep(0.25)
+        if mine.get("review"):
+            print(f"  = {name}")
+        elif mine["allowed"]:
+            call("PUT", f"/me/products/{product_id}/review", alice, {"rating": stars, "comment": comment})
+            print(f"  + {name}: {stars} stars")
+        else:
+            print(f"  ! {name}: no confirmed order of it, no review")
 
     print(f"Done: {BASE} (the best sellers are cached 5 minutes by the API)")
 

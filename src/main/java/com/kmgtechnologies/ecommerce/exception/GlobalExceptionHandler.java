@@ -84,6 +84,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return imageProblem(HttpStatus.UNPROCESSABLE_CONTENT, "Invalid image", ex.getMessage(), "INVALID_IMAGE");
     }
 
+    @ExceptionHandler(ReviewNotAllowedException.class)
+    public ProblemDetail handleReviewNotAllowed(ReviewNotAllowedException ex) {
+        return imageProblem(HttpStatus.FORBIDDEN, "Review not allowed", ex.getMessage(), "REVIEW_NOT_ALLOWED");
+    }
+
     @ExceptionHandler(ImageLimitException.class)
     public ProblemDetail handleImageLimit(ImageLimitException ex) {
         return imageProblem(HttpStatus.CONFLICT, "Too many images", ex.getMessage(), "IMAGE_LIMIT");
@@ -122,7 +127,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return handleExceptionInternal(ex, problem, headers, status, request);
     }
 
-    /** Image errors carry a stable {@code code}: the front-end shows its own message for each. */
+    /** Errors that carry a stable {@code code} (images, reviews): the front-end shows its own message for each. */
     private static ProblemDetail imageProblem(HttpStatus status, String title, String detail, String code) {
         ProblemDetail problem = problem(status, title, detail);
         problem.setProperty("code", code);

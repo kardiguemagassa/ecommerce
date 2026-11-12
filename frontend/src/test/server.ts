@@ -54,6 +54,11 @@ export const customers = [
   { id: 2, fullName: 'Bob Durand', email: 'bob@example.com' },
 ];
 
+export const noReviews = {
+  rating: { count: 0 },
+  distribution: [5, 4, 3, 2, 1].map((stars) => ({ stars, count: 0 })),
+};
+
 export const server = setupServer(
   http.get('*/api/me/session', () => HttpResponse.json(anonymous)),
   http.get('*/api/me/cart', () => HttpResponse.json(emptyCart)),
@@ -69,6 +74,9 @@ export const server = setupServer(
   http.get('*/api/admin/customers/:id/orders', () => HttpResponse.json(pageOf(orderSummaries, orderSummaries.length, 20))),
   http.get('*/api/admin/customers/:id/orders/:orderId', () => HttpResponse.json(order)),
   http.get('*/api/products/top-selling', () => HttpResponse.json([])),
+  http.get('*/api/products/:id/reviews', () => HttpResponse.json(pageOf([], 0, 10))),
+  http.get('*/api/products/:id/reviews/summary', () => HttpResponse.json(noReviews)),
+  http.get('*/api/me/products/:id/review', () => HttpResponse.json({ allowed: false })),
   http.get('*/api/products/:id', ({ params }) => {
     const product = products.find((item) => item.id === Number(params.id));
     return product

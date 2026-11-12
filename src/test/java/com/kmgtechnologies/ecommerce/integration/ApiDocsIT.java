@@ -66,7 +66,7 @@ class ApiDocsIT {
     @Test
     void groupsEndpointsUnderTheBusinessTagsAndTheSession() {
         List<String> tags = apiDocs.read("$.tags[*].name");
-        assertThat(tags).containsExactlyInAnyOrder("Cart", "Categories", "Customers", "Orders", "Products", "Session");
+        assertThat(tags).containsExactlyInAnyOrder("Cart", "Categories", "Customers", "Orders", "Products", "Reviews", "Session");
     }
 
     @Test

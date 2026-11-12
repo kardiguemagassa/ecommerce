@@ -38,6 +38,7 @@ const byCode: Record<string, string> = {
   UNSUPPORTED_IMAGE: fr.errors.unsupportedImage,
   INVALID_IMAGE: fr.errors.invalidImage,
   IMAGE_LIMIT: fr.errors.imageLimit,
+  REVIEW_NOT_ALLOWED: fr.errors.reviewNotAllowed,
   STORAGE_UNAVAILABLE: fr.errors.storageUnavailable,
   RATE_LIMITED: fr.errors.rateLimited,
 };

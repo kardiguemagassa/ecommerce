@@ -7,7 +7,9 @@ import type { Product } from '../api/catalog';
 import { formatPrice } from '../i18n/format';
 import { AddToCartButton } from '../product/AddToCartButton';
 import { ProductImage } from '../product/ProductImage';
+import { Stars } from '../product/Stars';
 import { StockLabel } from '../product/StockLabel';
+import { fr } from '../i18n/fr';
 
 export function ProductCard({ product }: { product: Product }) {
   const href = `/produits/${product.id}`;
@@ -26,6 +28,14 @@ export function ProductCard({ product }: { product: Product }) {
             {product.name}
           </Link>
         </Typography>
+        {(product.rating?.count ?? 0) > 0 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Stars value={product.rating?.average ?? 0} size={16} label={fr.reviews.cardLabel(product.rating?.average ?? 0, product.rating?.count ?? 0)} />
+            <Typography variant="body2" color="text.secondary" aria-hidden>
+              ({product.rating?.count})
+            </Typography>
+          </Box>
+        )}
         <StockLabel stock={product.stock ?? 0} />
         <Box sx={{ mt: 'auto', pt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
           <Typography sx={{ fontFamily: 'Manrope, sans-serif', fontSize: 20, fontWeight: 800 }}>{formatPrice(product.price)}</Typography>

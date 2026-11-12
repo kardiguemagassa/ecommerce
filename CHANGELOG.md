@@ -4,6 +4,19 @@ Notable changes of each release. The format follows [Keep a Changelog](https://k
 versions [Semantic Versioning](https://semver.org/). Each release publishes two images on Docker Hub:
 `kardigue/ecommerce-api` and `kardigue/ecommerce-web`.
 
+## [Unreleased]
+
+### Added
+
+- **Customer reviews.** A customer with a confirmed order of a product gives it 1 to 5 stars and a comment, once
+  (changed or deleted afterwards); every review shows "Achat vérifié" and the author as "Alice M.". The catalogue
+  cards and the product page show the average and the count; the product page shows the spread over the stars and
+  the reviews, newest first, and describes the product for search engines (schema.org `AggregateRating`).
+- API: `GET /api/products/{id}/reviews`, `GET /api/products/{id}/reviews/summary`, `GET`/`PUT`/`DELETE
+  /api/me/products/{id}/review` (403 `REVIEW_NOT_ALLOWED` without a confirmed order); `rating` in the products.
+  Migration `V6`.
+- `scripts/demo-data.py` writes alice's reviews of the products she ordered.
+
 ## [2.1.0] - 2026-11-07
 
 ### Added
@@ -120,6 +133,7 @@ the stack changes shape: the API is no longer published on its own port, everyth
 - Actuator and business metrics on a dedicated management port, Prometheus and Grafana.
 - Unit, slice and integration tests, JaCoCo coverage.
 
+[Unreleased]: https://github.com/kardiguemagassa/ecommerce/compare/v2.1.0...dev
 [2.1.0]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/kardiguemagassa/ecommerce/compare/v2.0.0...v2.0.1
