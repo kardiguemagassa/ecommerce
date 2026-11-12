@@ -102,6 +102,16 @@ jobs:
             echo "::add-mask::$value"
             sed -i "s|^${key}=.*|${key}=${value}|" .env
           done
+      # The images of the registries (Docker Hub, quay.io) first, apart: a registry briefly unavailable is retried, and
+      # a lasting outage fails here, plainly, rather than in the middle of the start. api and web are built.
+      - name: Pull images
+        run: |
+          for attempt in 1 2 3; do
+            docker compose --profile app pull --ignore-buildable --quiet && exit 0
+            echo "::warning::image pull failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
       - name: Start the stack
         run: docker compose --profile app up -d --build --wait --wait-timeout 300
       # Everything through nginx: an order, the browser login, images, security headers, the order trace in Tempo and
@@ -147,6 +157,16 @@ jobs:
           npm ci --no-audit
           npm run typecheck
           npx playwright install --with-deps chromium
+      # The images of the registries (Docker Hub, quay.io) first, apart: a registry briefly unavailable is retried, and
+      # a lasting outage fails here, plainly, rather than in the middle of the start. api and web are built.
+      - name: Pull images
+        run: |
+          for attempt in 1 2 3; do
+            docker compose --profile app pull --ignore-buildable --quiet && exit 0
+            echo "::warning::image pull failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
       - name: Start the stack
         run: docker compose --profile app up -d --build --wait --wait-timeout 300
       - name: End-to-end tests
